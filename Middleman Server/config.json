@@ -1,6 +1,6 @@
 {
   "redcap_url": "YOUR_REDCAP_URL",
-  "redcap_api_token": "YOUR_REDCAP_API_TOKEN",  // determines which REDCap project the middleware accesses
+  "redcap_api_token": "YOUR_REDCAP_API_TOKEN",
   "jwt_secret": "GENERATE_A_SECURE_RANDOM_STRING",
   "wordpress_url": "YOUR_WORDPRESS_URL",
   "allowed_origins": ["YOUR_WORDPRESS_URL"]
