@@ -52,6 +52,8 @@ python secure-patient-middleware.py
 # gunicorn --bind 0.0.0.0:5000 secure-patient-middleware:app
 ```
 
+(Your REDCap API token determines which REDCap project the middleware accesses)
+
 ### 2. Configure Your REDCap Project
 
 1. Ensure each record in your REDCap project has an email field
