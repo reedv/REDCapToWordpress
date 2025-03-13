@@ -1,0 +1,329 @@
+/* REDCap Patient Portal Styles */
+
+/* Container */
+.redcap-portal-container {
+    margin: 20px 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+}
+
+/* Sections */
+.redcap-portal-section {
+    margin-bottom: 30px;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 5px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.redcap-section-title {
+    margin-top: 0;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+    font-size: 1.5em;
+    color: #333;
+}
+
+/* Forms */
+.redcap-form {
+    max-width: 500px;
+}
+
+.redcap-form-group {
+    margin-bottom: 15px;
+}
+
+.redcap-form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+.redcap-form-group input[type="text"],
+.redcap-form-group input[type="password"],
+.redcap-form-group input[type="email"] {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+.redcap-form-actions {
+    margin-top: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+/* Buttons */
+.redcap-button {
+    padding: 10px 20px;
+    border-radius: 4px;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    margin-right: 10px;
+}
+
+.redcap-primary-button {
+    background-color: #2271b1;
+    color: white;
+}
+
+.redcap-primary-button:hover {
+    background-color: #135e96;
+    color: white;
+}
+
+.redcap-secondary-button {
+    background-color: #f0f0f1;
+    color: #2c3338;
+    border: 1px solid #c3c4c7;
+}
+
+.redcap-secondary-button:hover {
+    background-color: #dcdcde;
+    color: #1d2327;
+}
+
+/* Links */
+.redcap-register-link,
+.redcap-forgot-password-link {
+    font-size: 14px;
+    text-decoration: none;
+    color: #2271b1;
+}
+
+.redcap-register-link:hover,
+.redcap-forgot-password-link:hover {
+    color: #135e96;
+    text-decoration: underline;
+}
+
+/* Messages */
+.redcap-message,
+.redcap-error-message,
+.redcap-success-message,
+.redcap-warning-message {
+    padding: 12px 15px;
+    margin: 10px 0;
+    border-radius: 4px;
+    border-left: 4px solid;
+}
+
+.redcap-message {
+    background-color: #f8f9fa;
+    border-left-color: #ddd;
+}
+
+.redcap-error-message {
+    background-color: #f8d7da;
+    border-left-color: #d32f2f;
+    color: #721c24;
+}
+
+.redcap-success-message {
+    background-color: #d4edda;
+    border-left-color: #4caf50;
+    color: #155724;
+}
+
+.redcap-warning-message {
+    background-color: #fff3cd;
+    border-left-color: #ffc107;
+    color: #856404;
+}
+
+/* Loading Spinner */
+.redcap-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.redcap-spinner {
+    border: 4px solid rgba(0, 0, 0, 0.1);
+    border-radius: 50%;
+    border-top: 4px solid #2271b1;
+    width: 30px;
+    height: 30px;
+    animation: redcap-spin 1s linear infinite;
+    margin-bottom: 10px;
+}
+
+@keyframes redcap-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Data Presentation */
+.redcap-profile-details,
+.redcap-survey-results,
+.redcap-all-data-container {
+    margin-top: 15px;
+}
+
+.redcap-profile-name {
+    font-size: 1.2em;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.redcap-profile-field,
+.redcap-survey-field,
+.redcap-data-field,
+.redcap-detail-field {
+    margin-bottom: 8px;
+    line-height: 1.5;
+}
+
+.redcap-field-name {
+    font-weight: 600;
+    margin-right: 5px;
+}
+
+.redcap-field-value {
+    word-break: break-word;
+}
+
+/* Survey Results */
+.redcap-survey-record {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eee;
+}
+
+.redcap-survey-record:last-child {
+    border-bottom: none;
+}
+
+.redcap-record-date {
+    font-style: italic;
+    color: #666;
+    margin-bottom: 10px;
+}
+
+/* Data Table */
+.redcap-data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    margin-bottom: 15px;
+}
+
+.redcap-data-table th,
+.redcap-data-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.redcap-data-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+}
+
+.redcap-data-table tr:hover {
+    background-color: #f5f5f5;
+}
+
+.redcap-data-summary {
+    margin-bottom: 15px;
+    font-style: italic;
+    color: #666;
+}
+
+/* Record Details */
+.redcap-record-details {
+    margin-top: 20px;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+}
+
+.redcap-details-content {
+    margin-bottom: 15px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+/* Debug Section */
+.redcap-debug-section {
+    margin-top: 40px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-left: 4px solid #6c757d;
+}
+
+.redcap-debug-content {
+    font-family: monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+#redcap-debug-log {
+    margin-top: 10px;
+    padding: 10px;
+    background-color: #343a40;
+    color: #f8f9fa;
+    border-radius: 4px;
+}
+
+.debug-item {
+    margin-bottom: 5px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #495057;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .redcap-form-actions {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .redcap-button {
+        margin-bottom: 10px;
+    }
+    
+    .redcap-data-table th,
+    .redcap-data-table td {
+        padding: 8px 10px;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .redcap-portal-container {
+        margin: 0;
+    }
+    
+    .redcap-portal-section {
+        box-shadow: none;
+        border: 1px solid #ddd;
+        page-break-inside: avoid;
+    }
+    
+    .redcap-button,
+    .redcap-portal-actions,
+    .redcap-view-details,
+    .redcap-close-details {
+        display: none !important;
+    }
+    
+    .redcap-record-details {
+        display: block !important;
+        border: none;
+        padding: 0;
+    }
+}
