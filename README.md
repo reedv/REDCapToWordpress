@@ -147,4 +147,3 @@ For more detailed debugging:
 4. Regularly audit access logs
 5. Consider IP restrictions for the middleware server
 
-For any questions, please contact your REDCap administrator or refer to the detailed implementation guide.
