@@ -89,6 +89,22 @@ jQuery(document).ready(function($) {
     // Initialize authentication and data classes
     const redcapAuth = new REDCapAuth(redcapPortal.middlewareUrl);
     const redcapData = new REDCapPatientData(redcapAuth, redcapPortal.middlewareUrl);
+
+    (async function() {
+      const verificationResult = await redcapAuth.verifyToken();
+      if (!verificationResult.valid) {
+        $('#redcap-portal-content').html(
+          '<div class="redcap-error-message">' +
+          (verificationResult.errorType === 'expired' ? 
+            '<?php echo esc_js(__('Your session has expired. Please log in again.', 'redcap-patient-portal')); ?>' : 
+            '<?php echo esc_js(__('Authentication error. Please log in again.', 'redcap-patient-portal')); ?>') +
+          '</div>' +
+          '<p><a href="<?php echo esc_js(site_url('/login')); ?>" class="redcap-button redcap-primary-button">' +
+          '<?php echo esc_js(__('Log In', 'redcap-patient-portal')); ?>' +
+          '</a></p>'
+        );
+        return;
+      }
     
     function debugLog(message) {
         <?php if ($show_debug): ?>
