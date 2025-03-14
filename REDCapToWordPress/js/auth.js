@@ -61,12 +61,16 @@ class REDCapAuth {
         credentials: 'include'
       });
       
+      const data = await response.json();
+      
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Authentication failed');
+        return {
+          success: false,
+          error: data.message || 'Authentication failed',
+          errorType: data.error || 'unknown'
+        };
       }
       
-      const data = await response.json();
       this.saveSession(data.token, data.expiresIn);
       
       return {
@@ -77,7 +81,8 @@ class REDCapAuth {
       console.error('Login error:', error);
       return {
         success: false,
-        error: error.message || 'Authentication failed'
+        error: error.message || 'Authentication failed',
+        errorType: 'network'
       };
     }
   }
@@ -99,28 +104,66 @@ class REDCapAuth {
   isAuthenticated() {
     return this.token !== null && this.tokenExpiry > new Date();
   }
+
+  async verifyToken() {
+    try {
+      if (!this.token) {
+        return { valid: false, error: 'No token available' };
+      }
+      
+      const response = await fetch(`${this.middlewareUrl}/auth/verify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ token: this.token }),
+        credentials: 'include'
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        // Handle different error types
+        if (data.error === 'token_expired') {
+          this.logout(); // Clear expired token
+          return { valid: false, error: 'Session expired', errorType: 'expired' };
+        } else {
+          this.logout(); // Clear invalid token
+          return { valid: false, error: 'Invalid session', errorType: 'invalid' };
+        }
+      }
+      
+      return { valid: true, user: data.user };
+    } catch (error) {
+      console.error('Token verification error:', error);
+      return { valid: false, error: 'Verification failed', errorType: 'network' };
+    }
+  }
   
   /**
    * Check token expiry and handle refresh if needed
    */
-  checkTokenExpiry() {
+  async checkTokenExpiry() {
     if (!this.token || !this.tokenExpiry) {
       return false;
     }
     
-    // If token expires in less than 5 minutes, log out
-    // In a production system, you'd implement token refresh instead
+    // If token expires in less than 5 minutes, verify with server
     if (this.tokenExpiry.getTime() - Date.now() < 300000) {
-      this.logout();
+      const verificationResult = await this.verifyToken();
       
-      // Notify the user they need to log in again
-      if (document.getElementById('redcap-session-expired-alert')) {
-        document.getElementById('redcap-session-expired-alert').style.display = 'block';
-      } else {
-        console.warn('Your session has expired. Please log in again.');
+      if (!verificationResult.valid) {
+        this.logout();
+        
+        // Notify the user they need to log in again
+        if (document.getElementById('redcap-session-expired-alert')) {
+          document.getElementById('redcap-session-expired-alert').style.display = 'block';
+        } else {
+          console.warn('Your session has expired. Please log in again.');
+        }
+        
+        return false;
       }
-      
-      return false;
     }
     
     return true;
