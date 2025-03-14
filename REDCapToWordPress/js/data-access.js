@@ -15,7 +15,15 @@ class REDCapPatientData {
   async getPatientData() {
     try {
       if (!this.auth.isAuthenticated()) {
-        throw new Error('User is not authenticated');
+        // Verify token with server for extra security
+        const verificationResult = await this.auth.verifyToken();
+        if (!verificationResult.valid) {
+          return {
+            success: false,
+            error: verificationResult.error || 'User is not authenticated',
+            errorType: verificationResult.errorType || 'auth'
+          };
+        }
       }
       
       const response = await fetch(this.patientDataEndpoint, {
@@ -24,12 +32,26 @@ class REDCapPatientData {
         credentials: 'include'
       });
       
+      const data = await response.json();
+      
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to fetch patient data');
+        // Handle specific error types
+        if (response.status === 401) {
+          this.auth.logout(); // Session expired or invalid
+          return {
+            success: false,
+            error: data.message || 'Authentication failed',
+            errorType: data.error || 'auth'
+          };
+        }
+        
+        return {
+          success: false,
+          error: data.message || 'Failed to fetch patient data',
+          errorType: 'api'
+        };
       }
       
-      const data = await response.json();
       return {
         success: true,
         data: data.records
@@ -38,7 +60,8 @@ class REDCapPatientData {
       console.error('Error fetching patient data:', error);
       return {
         success: false,
-        error: error.message || 'Failed to fetch patient data'
+        error: error.message || 'Failed to fetch patient data',
+        errorType: 'network'
       };
     }
   }
