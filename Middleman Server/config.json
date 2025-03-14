@@ -1,7 +1,8 @@
 {
-  "redcap_url": "YOUR_REDCAP_URL",
+  "redcap_url": "https://your-redcap-instance.org/api/",
   "redcap_api_token": "YOUR_REDCAP_API_TOKEN",
   "jwt_secret": "GENERATE_A_SECURE_RANDOM_STRING",
-  "wordpress_url": "YOUR_WORDPRESS_URL",
-  "allowed_origins": ["YOUR_WORDPRESS_URL"]
+  "wordpress_url": "https://your-wordpress-site.com",
+  "allowed_origins": ["https://your-wordpress-site.com"],
+  "jwt_expiration_minutes": 30
 }
