@@ -114,10 +114,18 @@ jQuery(document).ready(function($) {
                     );
                 }
             } else {
-                // Failed login
+                // Failed login with specific error handling
                 $('.redcap-login-loading').hide();
                 $('#redcap-login-form').show();
-                $('#redcap-login-error').show().text(result.error || '<?php echo esc_js(__('Login failed. Please check your credentials.', 'redcap-patient-portal')); ?>');
+                
+                let errorMessage = result.error || '<?php echo esc_js(__('Login failed. Please check your credentials.', 'redcap-patient-portal')); ?>';
+                
+                // Custom error messages for specific error types
+                if (result.errorType === 'network') {
+                    errorMessage = '<?php echo esc_js(__('Connection error. Please check your internet connection and try again.', 'redcap-patient-portal')); ?>';
+                }
+                
+                $('#redcap-login-error').show().text(errorMessage);
             }
         } catch (error) {
             // Error during login
