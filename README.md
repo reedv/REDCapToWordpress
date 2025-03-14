@@ -62,8 +62,8 @@ Our solution uses a secure middleware server with:
 
 A diagram of the information flow is shown below:
 
-![security overview](REDCapToWordpress/images/security_overview.png)
-![architecture overview](REDCapToWordpress/images/architecture_overview.png)
+![security overview](REDCapToWordPress/images/security_overview.png)
+![architecture overview](REDCapToWordPress/images/security_overview.png)
 
 ### Configuration
 
