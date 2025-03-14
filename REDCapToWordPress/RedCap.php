@@ -151,7 +151,7 @@ class REDCap_Patient_Portal {
         $token = isset($_POST['token']) ? sanitize_text_field($_POST['token']) : '';
         
         if (empty($token)) {
-            wp_send_json_error(array('message' => 'No token provided'));
+            wp_send_json_error(array('message' => 'No token provided', 'error' => 'missing_token'));
             return;
         }
         
@@ -163,17 +163,28 @@ class REDCap_Patient_Portal {
         ));
         
         if (is_wp_error($response)) {
-            wp_send_json_error(array('message' => 'Error contacting middleware server'));
+            wp_send_json_error(array(
+                'message' => 'Error contacting middleware server',
+                'error' => 'server_connection'
+            ));
             return;
         }
         
+        $status_code = wp_remote_retrieve_response_code($response);
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
         
-        if (isset($data['success']) && $data['success'] === true) {
+        if ($status_code === 200 && isset($data['success']) && $data['success'] === true) {
             wp_send_json_success($data);
         } else {
-            wp_send_json_error(array('message' => 'Invalid token'));
+            // Pass along the specific error type from middleware
+            $error_type = isset($data['error']) ? $data['error'] : 'invalid_token';
+            $message = isset($data['message']) ? $data['message'] : 'Invalid token';
+            
+            wp_send_json_error(array(
+                'message' => $message,
+                'error' => $error_type
+            ));
         }
     }
     
