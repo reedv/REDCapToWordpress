@@ -112,6 +112,7 @@ def wordpress_auth():
     if not user_email:
         return jsonify({'message': 'Could not retrieve user email'}), 500
     
+    # TODO
     # Verify user has a REDCap record by checking the wp_redcap table
     # You would need to set up API access to the WordPress database
     # or create a custom WordPress REST endpoint to verify this
