@@ -116,33 +116,33 @@ function register_to_redcap($email, $first_name, $last_name, $record_id){
 	insert_data_redcap($email, $record_id);
 }
 
-function get_pedigree($record_id, $token){
-    $configs = parse_ini_file(dirname(__FILE__, $levels=2) . "/config.ini");
-
-    $data = array(
-        'token' => $token,
-        'content' => 'file',
-        'action' => 'export',
-        'record' => $record_id,
-        'field' => 'study_pedigree',
-        'event' => '',
-        'returnFormat' => 'json'
-    );
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $configs['redcap_url']);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_VERBOSE, 0);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-    curl_setopt($ch, CURLOPT_AUTOREFERER, true);
-    curl_setopt($ch, CURLOPT_MAXREDIRS, 10);
-    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-    curl_setopt($ch, CURLOPT_FRESH_CONNECT, 1);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data, '', '&'));
-    $output = curl_exec($ch);
-    curl_close($ch);
-    return base64_encode($output);
-    //return $token;
-}
+//function get_pedigree($record_id, $token){
+//    $configs = parse_ini_file(dirname(__FILE__, $levels=2) . "/config.ini");
+//
+//    $data = array(
+//        'token' => $token,
+//        'content' => 'file',
+//        'action' => 'export',
+//        'record' => $record_id,
+//        'field' => 'study_pedigree',
+//        'event' => '',
+//        'returnFormat' => 'json'
+//    );
+//    $ch = curl_init();
+//    curl_setopt($ch, CURLOPT_URL, $configs['redcap_url']);
+//    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+//    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+//    curl_setopt($ch, CURLOPT_VERBOSE, 0);
+//    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+//    curl_setopt($ch, CURLOPT_AUTOREFERER, true);
+//    curl_setopt($ch, CURLOPT_MAXREDIRS, 10);
+//    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+//    curl_setopt($ch, CURLOPT_FRESH_CONNECT, 1);
+//    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data, '', '&'));
+//    $output = curl_exec($ch);
+//    curl_close($ch);
+//    return base64_encode($output);
+//    //return $token;
+//}
 
 ?>
