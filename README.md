@@ -84,6 +84,9 @@ add your study project's API token, along with other required settings:
 
 The middleware is designed to filter data by email address. Make sure your REDCap project has an email field that can be used to identify patients.
 
+The `REDCapToWordPress/config.ini` for the plugin logic should also be set to point to the middleware server.
+(Currently, it assumes no authorization needed for connections, so you should either configure the firewall for the middleware server to only accept incoming connections from your wordpress site and REDCap site IPs (or range of IPs) or modify the code to use api keys for authenticating to the middleware server).
+
 ### Activating the middleware server
 
 Upload the **Secure Middleware** folder to a server with appropriate security settings. It's recommended to:
