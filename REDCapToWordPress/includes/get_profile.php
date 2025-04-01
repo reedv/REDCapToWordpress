@@ -20,7 +20,7 @@ $data = request_data($record_id);
 // Depending on how your data is structured, custom code needs to be included here.
 $person = $data['proband'];
 
-$pedigree = get_pedigree($record_id, $data['token']);
+//$pedigree = get_pedigree($record_id, $data['token']);
 
 $info_spacing = '9px';
 
@@ -59,13 +59,13 @@ print '<div style="float:left; margin-top: 20px;">';
 		print '<br>';
 		
 	print '</div>';
-	print '<p style="font-size:25px;">Family Pedigree</p>';
-	if(base64_decode($pedigree)['error'] != "There is no file to download for this record") {
-		print '<img class="pedigree" src="data:image/png;base64,' . $pedigree . '" width=100%>';
-	}
-	else{
-		print '<p style="font-size:20px;" width=800px>Pedigree currently not available</p>';
-	}
+	//print '<p style="font-size:25px;">Family Pedigree</p>';
+	//if(base64_decode($pedigree)['error'] != "There is no file to download for this record") {
+	//	print '<img class="pedigree" src="data:image/png;base64,' . $pedigree . '" width=100%>';
+	//}
+	//else{
+	//	print '<p style="font-size:20px;" width=800px>Pedigree currently not available</p>';
+	//}
 print '</div>';
 
 //Relative information retrieval and display
