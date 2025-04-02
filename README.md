@@ -112,7 +112,7 @@ For local testing, can run...
 ```bash
 cd ./Middleman\ Server
 docker build -t wp2redcap_middleware
-docker run -p 8080:5000 wp2redcap_middleware
+docker run -p 8080:8080 wp2redcap_middleware
 ```
 ... then some sanity testing to request and recieve something like...
 ```bash
