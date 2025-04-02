@@ -30,7 +30,8 @@ JWT_SECRET = config.get("jwt_secret", "change-this-to-a-secure-random-string")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION = 30  # Minutes
 WORDPRESS_API_URL = config.get("wordpress_url", "") + "/wp-json/wp/v2"
-ALLOWED_ORIGINS = config.get("allowed_origins", ["http://localhost", "https://yourwordpresssite.com"])
+#ALLOWED_ORIGINS = config.get("allowed_origins", ["http://localhost", "https://yourwordpresssite.com"])
+ALLOWED_ORIGINS = config.get("allowed_origins", ["http://localhost")
 
 # CORS support
 @app.after_request
