@@ -108,6 +108,18 @@ python secure-patient-middleware.py
 gunicorn --bind 0.0.0.0:5000 secure-patient-middleware:app
 ```
 
+For local testing, can run...
+```bash
+cd ./Middleman\ Server
+docker build -t wp2redcap_middleware
+docker run -p 8080:5000 wp2redcap_middleware
+```
+... then some sanity testing to request and recieve something like...
+```bash
+$ curl http://localhost:8080/auth/wordpress -X POST -H "Content-Type: application/json" -d '{"username":"test","password":"test"}'
+{"message": "Invalid credentials"}
+```
+
 ## Security Model
 
 The security model ensures patients can only access their own data through:
