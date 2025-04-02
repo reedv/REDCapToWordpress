@@ -64,7 +64,7 @@ A diagram of the information flow is shown below:
 
 ![security overview](REDCapToWordPress/images/security_overview.png)
 ![architecture overview](REDCapToWordPress/images/archetecture_overview.png)
-![middleware data flow](REDCapToWordPress/images/wp2redcap middleware dataflow.png)
+![middleware data flow](REDCapToWordPress/images/wp2redcap_middleware_dataflow.png)
 
 ### Configuration
 
