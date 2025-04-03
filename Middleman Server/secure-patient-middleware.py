@@ -18,7 +18,23 @@ import os
 from functools import wraps
 from datetime import datetime, timedelta
 import logging
+import traceback
+import requests
+from flask import request, jsonify
+import json
 import sys
+
+# Configure logging to output to stdout/stderr for Cloud Run logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - [REDCap Auth] - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+# Force logs to stderr which Cloud Run captures
+handler = logging.StreamHandler(sys.stderr)
+handler.setLevel(logging.DEBUG)
+logger.addHandler(handler)
+
 
 app = Flask(__name__)
 
@@ -31,7 +47,8 @@ REDCAP_API_TOKEN = config.get("redcap_api_token", "")
 JWT_SECRET = config.get("jwt_secret", "change-this-to-a-secure-random-string")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION = 30  # Minutes
-WORDPRESS_API_URL = config.get("wordpress_url", "") + "/wp-json/wp/v2"
+WORDPRESS_URL = config.get("wordpress_url", "")
+WORDPRESS_API_URL = WORDPRESS_URL + "/wp-json/wp/v2"
 #ALLOWED_ORIGINS = config.get("allowed_origins", ["http://localhost", "https://yourwordpresssite.com"])
 ALLOWED_ORIGINS = config.get("allowed_origins", ["http://localhost"])
 
@@ -94,44 +111,131 @@ def token_required(f):
 @app.route('/auth/wordpress', methods=['POST'])
 def wordpress_auth():
     """Authenticate with WordPress credentials and return a secure token"""
-    data = request.get_json()
-    
-    if not data or 'username' not in data or 'password' not in data:
-        return jsonify({'message': 'Missing username or password'}), 400
-        
-    # Send authentication request to WordPress
-    # Using the WordPress Application Passwords feature (WP 5.6+), TODO: Change this so don't need to manually set Application Password for each user? Better way to do this? 
-    auth_response = requests.post(
-        f"{WORDPRESS_API_URL}/users/me", 
-        auth=(data['username'], data['password'])
-    )
+    # Log the start of the authentication attempt
+    client_ip = request.remote_addr
+    logger.info(f"Authentication attempt initiated")
+    logger.info(f"Client IP: {client_ip}")
 
-    if auth_response.status_code != 200:
-        return jsonify({'message': 'Invalid credentials'}), 401
-        
-    user_data = auth_response.json()
-    user_email = user_data.get('email')
-    
-    if not user_email:
-        return jsonify({'message': 'Could not retrieve user email'}), 500
-    
-    # TODO
-    # Verify user has a REDCap record by checking the wp_redcap table
-    # You would need to set up API access to the WordPress database
-    # or create a custom WordPress REST endpoint to verify this
-    
-    # Generate secure token for subsequent requests
-    token = generate_token(user_email)
-    
-    return jsonify({
-        'token': token,
-        'expiresIn': JWT_EXPIRATION * 60,
-        'user': {
-            'email': user_email,
-            'name': user_data.get('name', ''),
-            'id': user_data.get('id')
-        }
-    })
+    try:
+        # Extract request data
+        data = request.get_json()
+       
+        # Validate request data
+        if not data:
+            logger.warning("No JSON data received in authentication request")
+            return jsonify({
+                'message': 'No authentication data provided',
+                'error_type': 'invalid_request'
+            }), 400
+
+        # Log sanitized data (never log actual passwords)
+        logger.info(f"Authentication attempt for username: {data.get('username', 'N/A')}")
+
+        # Validate required fields
+        if 'username' not in data or 'password' not in data:
+            logger.warning("Missing username or password in authentication request")
+            return jsonify({
+                'message': 'Missing username or password',
+                'error_type': 'incomplete_credentials'
+            }), 400
+
+        # Attempt WordPress authentication
+        logger.info("Attempting to authenticate via WordPress REST API")
+       
+        # Additional logging for debugging network/request issues
+        wordpress_auth_url = f"{WORDPRESS_URL}/wp-json/redcap-portal/v1/authenticate"
+        logger.info(f"WordPress Authentication URL: {wordpress_auth_url}")
+
+        try:
+            # Log request details (without password)
+            request_log = {
+                'url': wordpress_auth_url,
+                'method': 'POST',
+                'headers': {'Content-Type': 'application/json'},
+                'username': data['username']
+            }
+            logger.info(f"Sending authentication request: {json.dumps(request_log)}")
+
+            # Make authentication request
+            auth_response = requests.post(
+                wordpress_auth_url,
+                json={
+                    'username': data['username'],
+                    'password': data['password']
+                },
+                timeout=10  # Add timeout to prevent hanging
+            )
+            print(f"AUTH DEBUG: Status code: {auth_response.status_code}", file=sys.stderr)
+            print(f"AUTH DEBUG: Response: {auth_response.text[:500]}", file=sys.stderr)
+
+            # Log response status
+            logger.info(f"WordPress Authentication Response Status: {auth_response.status_code}")
+           
+            # Log response content for debugging
+            try:
+                response_content = auth_response.json()
+                # Sanitize response before logging
+                sanitized_response = {k: v for k, v in response_content.items() if k != 'user'}
+                logger.info(f"Authentication Response Content: {json.dumps(sanitized_response)}")
+            except ValueError:
+                logger.warning("Could not parse response JSON")
+                logger.warning(f"Raw response content: {auth_response.text}")
+
+            # Check authentication result
+            if auth_response.status_code != 200:
+                logger.warning(f"WordPress authentication failed. Status code: {auth_response.status_code}")
+                return jsonify({
+                    'message': 'WordPress authentication failed. Invalid credentials.',
+                    'error_type': 'authentication_failed',
+                    'status_code': auth_response.status_code
+                }), 401
+
+            # Extract user data
+            auth_data = auth_response.json()
+            user_email = auth_data.get('user', {}).get('email')
+
+            if not user_email:
+                logger.error("No email found in authentication response")
+                return jsonify({
+                    'message': 'Invalid user data',
+                    'error_type': 'missing_email'
+                }), 401
+
+            # Log successful authentication
+            logger.info(f"Successful authentication for email: {user_email}")
+
+            # Generate JWT token
+            token = generate_token(user_email)
+           
+            # Log token generation (without revealing the token)
+            logger.info(f"JWT token generated for user: {user_email}")
+
+            return jsonify({
+                'token': token,
+                'expiresIn': JWT_EXPIRATION * 60,
+                'user': {
+                    'email': user_email
+                }
+            }), 200
+
+        except requests.exceptions.RequestException as req_err:
+            # Log network-related errors
+            logger.error(f"Request to WordPress failed: {str(req_err)}")
+            logger.error(traceback.format_exc())
+            return jsonify({
+                'message': 'Authentication service error',
+                'error_type': 'network_error',
+                'details': str(req_err)
+            }), 500
+
+    except Exception as e:
+        # Catch-all for any unexpected errors
+        logger.error(f"Unexpected error during authentication: {str(e)}")
+        logger.error(traceback.format_exc())
+        return jsonify({
+            'message': 'Internal authentication error',
+            'error_type': 'unexpected_error'
+        }), 500
 
 # Get patient data from REDCap
 @app.route('/patient/data', methods=['GET'])
@@ -139,7 +243,7 @@ def wordpress_auth():
 def get_patient_data(user_email):
     """Get patient's own data from REDCap, filtered by their email"""
     try:
-        # Make a secure REDCap API call with filtering
+        # Make a secure REDCap API call with filtering, see https://redcap.uhphawaii.org/api/help/?content=exp_records 
         data = {
             'token': REDCAP_API_TOKEN,
             'content': 'record',
@@ -151,13 +255,19 @@ def get_patient_data(user_email):
         
         # Replace 'email' with your actual REDCap email field name
         
-        redcap_response = requests.post(REDCAP_API_URL, data=data)
+        redcap_response = requests.post(REDCAP_API_URL, data=data)  ## If having SSL cert issues with redcap_url, can add arg verify=False to this call for debugging.
+        app.logger.info(f"REDCap raw response: {redcap_response.text[:200]}...")  # Log first 200 chars
         
         if redcap_response.status_code != 200:
             app.logger.error(f"REDCap API error: {redcap_response.text}")
             return jsonify({'message': 'Error fetching records from REDCap'}), 500
             
         records = redcap_response.json()
+        app.logger.info(f"Records before filtering: {len(records)}")
+        app.logger.info(f"Looking for email: {user_email}")
+        if records:
+            app.logger.info(f"Sample record keys: {list(records[0].keys())}")
+            app.logger.info(f"Email field values: {[r.get('email') for r in records[:5]]}")
         
         # Double-check email filtering to ensure no data leakage
         # This is a security safeguard in case filterLogic fails
@@ -220,17 +330,10 @@ def log_access(user_email, access_type, data_requested):
 
 # Start the application
 if __name__ == '__main__':
-    # Set up logging
-    import logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        filename='redcap_middleware.log'
-    )
     
     # For production, use a proper WSGI server like Gunicorn
     # Production server
     # gunicorn --bind 0.0.0.0:5000 app:app
     
     # For development
-    app.run(debug=False, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5000)
