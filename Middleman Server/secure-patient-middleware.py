@@ -22,14 +22,6 @@ import sys
 
 app = Flask(__name__)
 
-# Configure logging to write to stdout
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(message)s',
-    stream=sys.stdout
-)
-logger = logging.getLogger(__name__)
-
 # Load configuration
 with open("config.json", "r") as f:
     config = json.load(f)
