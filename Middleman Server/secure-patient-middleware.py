@@ -243,7 +243,7 @@ def wordpress_auth():
 def get_patient_data(user_email):
     """Get patient's own data from REDCap, filtered by their email"""
     try:
-        # Make a secure REDCap API call with filtering, see https://redcap.uhphawaii.org/api/help/?content=exp_records 
+        # Make a secure REDCap API call with filtering, see https://<your redcap url>/api/help/?content=exp_records 
         data = {
             'token': REDCAP_API_TOKEN,
             'content': 'record',
