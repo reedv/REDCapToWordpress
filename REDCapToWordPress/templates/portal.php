@@ -105,6 +105,7 @@ jQuery(document).ready(function($) {
         );
         return;
       }
+    })();
     
     function debugLog(message) {
         <?php if ($show_debug): ?>
