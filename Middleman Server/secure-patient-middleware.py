@@ -22,15 +22,13 @@ import sys
 
 app = Flask(__name__)
 
-# Configure comprehensive logging
+# Configure logging to write to stdout
 logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),  # Log to console
-        logging.FileHandler('auth_debug.log')  # Log to file
-    ]
+    level=logging.INFO,
+    format='%(message)s',
+    stream=sys.stdout
 )
+logger = logging.getLogger(__name__)
 
 # Load configuration
 with open("config.json", "r") as f:
@@ -104,30 +102,18 @@ def token_required(f):
 @app.route('/auth/wordpress', methods=['POST'])
 def wordpress_auth():
     """Authenticate with WordPress credentials and return a secure token"""
-    # Log incoming request details
-    logging.info(f"Received authentication request from IP: {request.remote_addr}")
-    logging.info(f"Request headers: {dict(request.headers)}")
-    
     data = request.get_json()
-
-    # Log parsed request data (be careful not to log actual passwords)
-    logging.info(f"Request contains username: {data.get('username', 'NO USERNAME')}")   
     
     if not data or 'username' not in data or 'password' not in data:
         return jsonify({'message': 'Missing username or password'}), 400
         
     # Send authentication request to WordPress
     # Using the WordPress Application Passwords feature (WP 5.6+), TODO: Change this so don't need to manually set Application Password for each user? Better way to do this? 
-    # Log details about WordPress authentication attempt
-    logging.debug(f"Attempting WordPress authentication to URL: {WORDPRESS_URL}")       
     auth_response = requests.post(
         f"{WORDPRESS_API_URL}/users/me", 
         auth=(data['username'], data['password'])
     )
 
-    logging.info(f"WordPress auth response status: {auth_response.status_code}")
-    logging.debug(f"WordPress auth response headers: {auth_response.headers}")        
-    
     if auth_response.status_code != 200:
         return jsonify({'message': 'Invalid credentials'}), 401
         
