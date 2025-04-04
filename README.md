@@ -40,7 +40,11 @@ Create a page on your site with a URL that matches your redirect_url (e.g., **yo
 
 On this page, add the shortcode **[redcap_portal]**.
 
-To display specific survey results, use **[redcap_portal survey="survey_name"]**.
+Create a page on your site for registering existing study participants to your wordpress site (e.g., **yoursite.com/registration**).
+
+On this page, add the shortcode **[redcap_registration redirect="/my-data"]**
+
+To display specific survey results (eg. on additional pages), use **[redcap_portal survey="survey_name"]**.
 
 ## Building the Security Middleware
 
