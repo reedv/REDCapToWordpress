@@ -237,13 +237,62 @@ def wordpress_auth():
             'error_type': 'unexpected_error'
         }), 500
 
+@app.route('/auth/verify', methods=['POST', 'OPTIONS'])
+def auth_verify():
+    """Verify a JWT token and return user data if valid"""
+    # Handle OPTIONS requests for CORS preflight
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    # Handle POST requests
+    try:
+        data = request.get_json()
+        
+        if not data or 'token' not in data:
+            logger.warning("Token verification attempt with missing token")
+            return jsonify({
+                'success': False,
+                'message': 'No token provided',
+                'error': 'missing_token'
+            }), 400
+        
+        # Get and verify the token
+        token = data.get('token')
+        user_email = verify_token(token)
+        
+        if not user_email:
+            logger.warning("Invalid or expired token verification attempt")
+            return jsonify({
+                'success': False,
+                'message': 'Invalid or expired token',
+                'error': 'invalid_token'
+            }), 401
+        
+        # Token is valid, return success with user info
+        logger.info(f"Token successfully verified for user: {user_email}")
+        return jsonify({
+            'success': True,
+            'user': {
+                'email': user_email
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error in token verification: {str(e)}")
+        logger.error(traceback.format_exc())
+        return jsonify({
+            'success': False,
+            'message': 'An unexpected error occurred',
+            'error': 'server_error'
+        }), 500
+
 # Get patient data from REDCap
 @app.route('/patient/data', methods=['GET'])
 @token_required
 def get_patient_data(user_email):
     """Get patient's own data from REDCap, filtered by their email"""
     try:
-        # Make a secure REDCap API call with filtering, see https://redcap.uhphawaii.org/api/help/?content=exp_records 
+        # Make a secure REDCap API call with filtering, see https://<your redcap_url>/api/help/?content=exp_records 
         data = {
             'token': REDCAP_API_TOKEN,
             'content': 'record',
