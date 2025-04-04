@@ -10,7 +10,7 @@ This middleware ensures patients can only access their own REDCap data by:
 Deploy this as a separate service alongside your WordPress installation.
 """
 
-from flask import Flask, request, jsonify, abort
+from flask import Flask, request, jsonify, abort, make_response
 import requests
 import jwt
 import json
@@ -147,7 +147,7 @@ def verify_participant():
             'returnFormat': 'json'
         }
         
-        redcap_response = requests.post(REDCAP_API_URL, data=redcap_data)  ## Including arg verify=False for debugging/dev runs if redcap_url having SSL issues
+        redcap_response = requests.post(REDCAP_API_URL, data=redcap_data, verify=False)  ## Including arg verify=False for debugging/dev runs if redcap_url having SSL issues
         
         if redcap_response.status_code != 200:
             logger.error(f"REDCap API error: {redcap_response.text}")
@@ -388,7 +388,7 @@ def get_patient_data(user_email):
         
         # Replace 'email' with your actual REDCap email field name
         
-        redcap_response = requests.post(REDCAP_API_URL, data=data)  ## If having SSL cert issues with redcap_url, can add arg verify=False to this call for debugging.
+        redcap_response = requests.post(REDCAP_API_URL, data=data, verify=False)  ## If having SSL cert issues with redcap_url, can add arg verify=False to this call for debugging.
         app.logger.info(f"REDCap raw response: {redcap_response.text[:200]}...")  # Log first 200 chars
         
         if redcap_response.status_code != 200:
@@ -435,7 +435,7 @@ def get_survey_results(user_email, survey_name):
             'returnFormat': 'json'
         }
         
-        redcap_response = requests.post(REDCAP_API_URL, data=data)
+        redcap_response = requests.post(REDCAP_API_URL, data=data, verify=False)
         
         if redcap_response.status_code != 200:
             app.logger.error(f"REDCap API error: {redcap_response.text}")
@@ -453,6 +453,126 @@ def get_survey_results(user_email, survey_name):
         
     except Exception as e:
         app.logger.error(f"Error in get_survey_results: {str(e)}")
+        return jsonify({'message': 'An unexpected error occurred'}), 500
+    
+@app.route('/patient/survey_metadata/<survey_name>', methods=['GET'])
+@token_required
+def get_survey_metadata(user_email, survey_name):
+    """Get comprehensive metadata for a specific survey"""
+    try:
+        # Sanitize survey name
+        survey_name = survey_name.strip()
+        
+        # Get metadata (field definitions)
+        metadata_data = {
+            'token': REDCAP_API_TOKEN,
+            'content': 'metadata',
+            'format': 'json',
+            'forms[0]': survey_name,
+            'returnFormat': 'json'
+        }
+        
+        metadata_response = requests.post(REDCAP_API_URL, data=metadata_data, verify=False)
+        
+        if metadata_response.status_code != 200:
+            logger.error(f"REDCap API error (metadata): {metadata_response.text}")
+            return jsonify({'message': 'Error fetching survey metadata'}), 500
+            
+        metadata = metadata_response.json()
+        
+        # Get form/instrument information (for matrix grouping)
+        instrument_data = {
+            'token': REDCAP_API_TOKEN,
+            'content': 'instrument',
+            'format': 'json',
+            'returnFormat': 'json'
+        }
+        
+        instrument_response = requests.post(REDCAP_API_URL, data=instrument_data, verify=False)
+        
+        if instrument_response.status_code != 200:
+            logger.error(f"REDCap API error (instrument): {instrument_response.text}")
+            return jsonify({'message': 'Error fetching instrument data'}), 500
+            
+        instruments = instrument_response.json()
+        
+        # Get field mapping for matrices
+        formEventMapping = None
+        if any(field.get('grid_name') for field in metadata):
+            mapping_data = {
+                'token': REDCAP_API_TOKEN,
+                'content': 'formEventMapping',
+                'format': 'json',
+                'returnFormat': 'json'
+            }
+            
+            mapping_response = requests.post(REDCAP_API_URL, data=mapping_data, verify=False)
+            
+            if mapping_response.status_code == 200:
+                formEventMapping = mapping_response.json()
+        
+        # Get file repository info if there are file upload fields
+        fileFields = [field for field in metadata if field.get('field_type') == 'file']
+        fileRepository = None
+        
+        if fileFields:
+            # Create endpoint to retrieve files securely
+            @app.route('/patient/file/<record_id>/<field_name>', methods=['GET'])
+            @token_required
+            def get_file(user_email, record_id, field_name):
+                # Verify this user has access to this record
+                verification_data = {
+                    'token': REDCAP_API_TOKEN,
+                    'content': 'record',
+                    'format': 'json',
+                    'type': 'flat',
+                    'records[0]': record_id,
+                    'fields[0]': 'email',
+                    'returnFormat': 'json'
+                }
+                
+                verification_response = requests.post(REDCAP_API_URL, data=verification_data, verify=False)
+                
+                if verification_response.status_code != 200:
+                    return jsonify({'message': 'Error verifying record access'}), 500
+                    
+                records = verification_response.json()
+                
+                if not records or records[0].get('email') != user_email:
+                    return jsonify({'message': 'Access denied to this record'}), 403
+                
+                # Get file data
+                file_data = {
+                    'token': REDCAP_API_TOKEN,
+                    'content': 'file',
+                    'action': 'export',
+                    'record': record_id,
+                    'field': field_name,
+                    'returnFormat': 'json'
+                }
+                
+                file_response = requests.post(REDCAP_API_URL, data=file_data, verify=False)
+                
+                if file_response.status_code != 200:
+                    return jsonify({'message': 'Error retrieving file'}), 500
+                
+                # Create response with appropriate content type
+                response = make_response(file_response.content)
+                response.headers.set('Content-Type', file_response.headers.get('Content-Type', 'application/octet-stream'))
+                response.headers.set('Content-Disposition', file_response.headers.get('Content-Disposition', f'attachment; filename="{field_name}_file"'))
+                
+                return response
+        
+        return jsonify({
+            'metadata': metadata,
+            'instruments': instruments,
+            'formEventMapping': formEventMapping,
+            'hasFileFields': bool(fileFields)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in get_survey_metadata: {str(e)}")
+        logger.error(traceback.format_exc())
         return jsonify({'message': 'An unexpected error occurred'}), 500
 
 # Security audit log

@@ -127,7 +127,7 @@ class REDCap_Patient_Portal {
                 'redcap-data',
                 REDCAP_PORTAL_URL . 'js/data-access.js',
                 array('jquery', 'redcap-auth'),
-                REDCAP_PORTAL_VERSION,
+                REDCAP_PORTAL_VERSION . '.' . time(), // Force cache refresh with timestamp, wp site was caching this in internal asset cache and not using updated versions even after installing new plugin zip or clearing browser cache
                 true
             );
             
@@ -337,6 +337,11 @@ class REDCap_Patient_Portal {
             'survey' => '',
             'show_profile' => 'yes',
         ), $atts, 'redcap_portal');
+        
+        // Check for URL parameter override
+        if (isset($_GET['survey']) && !empty($_GET['survey'])) {
+            $atts['survey'] = sanitize_text_field($_GET['survey']);
+        }
         
         ob_start();
         include(REDCAP_PORTAL_PATH . 'templates/portal.php');

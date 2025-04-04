@@ -46,6 +46,99 @@ On this page, add the shortcode **[redcap_registration redirect="/my-data"]**
 
 To display specific survey results (eg. on additional pages), use **[redcap_portal survey="survey_name"]**.
 
+### Adding and Displaying Multiple Surveys in the REDCap Patient Portal
+
+The REDCap Patient Portal allows you to display multiple survey results to users through a simple configuration system. This document explains how to add additional surveys to your portal implementation.
+
+#### Basic Survey Display
+
+Each survey can be displayed using the `[redcap_portal]` shortcode with a survey parameter:
+
+```
+[redcap_portal survey="medication_survey" show_profile="yes"]
+```
+
+Place this shortcode on any WordPress page where you want to show patient data from REDCap.
+
+#### Multiple Survey Configuration Options
+
+##### Option 1: Separate Pages
+
+You can create multiple pages in WordPress, each with a different shortcode configuration:
+
+1. Create a page for each survey (e.g., "Demographics", "Medications", "Follow-up")
+2. Add the appropriate shortcode to each page:
+   ```
+   [redcap_portal survey="demographics"]
+   [redcap_portal survey="medication_survey"]
+   [redcap_portal survey="follow_up_survey"]
+   ```
+3. Create a menu in WordPress to link to these pages
+
+##### Option 2: URL Parameters (Recommended)
+
+For a more integrated experience, you can use a single page with URL parameters:
+
+1. Create a single page (e.g., "My Data")
+2. Add the basic shortcode: `[redcap_portal]`
+3. Users can access different surveys via URLs:
+   - `/my-data?survey=demographics`
+   - `/my-data?survey=medication_survey`
+   - `/my-data?survey=follow_up_survey`
+
+##### Option 3: Tab-based Navigation
+
+For a more interactive interface, you can add a tab navigation system:
+
+1. Create a single page with the shortcode: `[redcap_portal]`
+2. Add this HTML before the shortcode:
+   ```html
+   <div class="redcap-portal-nav">
+       <ul>
+           <li><a href="?survey=demographics">Demographics</a></li>
+           <li><a href="?survey=medication_survey">Medications</a></li>
+           <li><a href="?survey=follow_up_survey">Follow-ups</a></li>
+       </ul>
+   </div>
+   ```
+3. Add custom CSS to style the navigation tabs
+
+#### Adding New Surveys to the Portal
+
+To add a new survey to your portal:
+
+1. **Identify the REDCap Survey Name**: Find the exact form/survey name in your REDCap project (e.g., `baseline_assessment`)
+
+2. **Configure the Middleware**: Ensure your middleware is configured to serve data from this survey/form through the API
+
+3. **Add the Survey to Your Portal**: Use one of the methods above to include the survey in your patient portal
+
+4. **Test Access Control**: Verify that patients can only see their own data from the new survey
+
+#### Customizing Survey Display
+
+Each survey's display can be customized by:
+
+1. Modifying the `portal.php` template file in the plugin's `templates` directory
+2. Adding custom CSS to your theme to style specific survey elements
+3. Using the survey name as a CSS class selector for targeted styling:
+   ```css
+   .redcap-survey-results[data-survey="medication_survey"] {
+       /* Custom styling for medication survey */
+   }
+   ```
+
+### Troubleshooting Survey Display
+
+If a survey doesn't display properly:
+
+1. Check your browser's developer console for JavaScript errors
+2. Verify the survey name exactly matches the form name in REDCap
+3. Confirm the middleware logs show successful requests for the survey data
+4. Test if data exists for the current user in that specific survey
+
+The portal is designed to gracefully handle missing data, displaying appropriate messages when no survey responses exist for the current user.
+
 ## Building the Security Middleware
 
 ### Description and Rationale

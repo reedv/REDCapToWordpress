@@ -3,10 +3,14 @@
  */
 class REDCapPatientData {
   constructor(auth, middlewareUrl) {
+    console.log('REDCapPatientData initializing with:', { auth: !!auth, middlewareUrl })
     this.auth = auth;
     this.middlewareUrl = middlewareUrl;
     this.patientDataEndpoint = `${middlewareUrl}/patient/data`;
     this.surveysEndpoint = `${middlewareUrl}/patient/surveys`;
+    this.metadataEndpoint = `${middlewareUrl}/patient/survey_metadata`;
+    this.fileEndpoint = `${middlewareUrl}/patient/file`;
+    console.log('REDCapPatientData initialized successfully');
   }
   
   /**
@@ -101,6 +105,75 @@ class REDCapPatientData {
         error: error.message || `Failed to fetch ${surveyName} survey data`
       };
     }
+  }
+
+  async getSurveyMetadata(surveyName) {
+    try {
+        if (!this.auth.isAuthenticated()) {
+            const verificationResult = await this.auth.verifyToken();
+            if (!verificationResult.valid) {
+                return {
+                    success: false,
+                    error: verificationResult.error || 'User is not authenticated',
+                    errorType: verificationResult.errorType || 'auth'
+                };
+            }
+        }
+        
+        const response = await fetch(`${this.metadataEndpoint}/${surveyName}`, {
+            method: 'GET',
+            headers: this.auth.getAuthHeaders(),
+            credentials: 'include'
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            if (response.status === 401) {
+                this.auth.logout();
+                return {
+                    success: false,
+                    error: data.message || 'Authentication failed',
+                    errorType: data.error || 'auth'
+                };
+            }
+            
+            return {
+                success: false,
+                error: data.message || 'Failed to fetch survey metadata',
+                errorType: 'api'
+            };
+        }
+        
+        return {
+            success: true,
+            metadata: data.metadata,
+            instruments: data.instruments,
+            formEventMapping: data.formEventMapping,
+            hasFileFields: data.hasFileFields
+        };
+    } catch (error) {
+        console.error('Error fetching survey metadata:', error);
+        return {
+            success: false,
+            error: error.message || 'Failed to fetch survey metadata',
+            errorType: 'network'
+        };
+    }
+  }
+
+  // Helper method to download files
+  getFileDownloadUrl(recordId, fieldName) {
+    if (!this.auth.isAuthenticated()) {
+        return null;
+    }
+    
+    // Extract appropriate authentication from headers
+    const headers = this.auth.getAuthHeaders();
+    const authHeader = headers.Authorization || '';
+    const token = authHeader.replace('Bearer ', '');
+    
+    return `${this.fileEndpoint}/${recordId}/${fieldName}?token=${token}`;
   }
   
   /**

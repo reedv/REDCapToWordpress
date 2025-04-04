@@ -20,6 +20,12 @@ $options = get_option('redcap_portal_settings');
 $show_debug = isset($options['show_debug_info']) && $options['show_debug_info'] === 'yes' && current_user_can('manage_options');
 ?>
 
+<div class="redcap-portal-nav">
+    <ul>
+        <li><a href="/my-data?survey=consent_form">Consent form</a></li>
+        <li><a href="/my-data?survey=preenrollment_screening_questionnaire">Pre-Enrollment Questionnaire</a></li>
+    </ul>
+</div>
 <div class="redcap-portal-container">
     <div id="redcap-portal-content">
         <!-- Authentication check message will appear here if not logged in -->
@@ -212,55 +218,341 @@ jQuery(document).ready(function($) {
     (async function loadSurvey() {
         try {
             debugLog('Loading survey: <?php echo esc_js($survey); ?>');
-            const result = await redcapData.getSurveyResults('<?php echo esc_js($survey); ?>');
             
-            if (result.success && result.data && result.data.length > 0) {
+            // First fetch the metadata to understand the structure
+            const metadataResult = await redcapData.getSurveyMetadata('<?php echo esc_js($survey); ?>');
+            if (!metadataResult.success) {
+                throw new Error(metadataResult.error || 'Failed to load survey metadata');
+            }
+            
+            // Now fetch the actual survey data
+            const dataResult = await redcapData.getSurveyResults('<?php echo esc_js($survey); ?>');
+            if (!dataResult.success) {
+                throw new Error(dataResult.error || 'Failed to load survey data');
+            }
+            
+            if (dataResult.data && dataResult.data.length > 0 && metadataResult.metadata) {
+                // Process and display the data with metadata context
                 let surveyHtml = '<div class="redcap-survey-results">';
                 
-                // Process survey data
-                result.data.forEach(record => {
-                    surveyHtml += '<div class="redcap-survey-record">';
-                    
-                    // Add survey completion date if available
-                    if (record.survey_date || record.survey_timestamp || record.date) {
-                        const dateField = record.survey_date || record.survey_timestamp || record.date;
-                        surveyHtml += '<div class="redcap-record-date">' + 
-                            '<?php echo esc_js(__('Date:', 'redcap-patient-portal')); ?> ' + dateField + 
-                            '</div>';
+                // Create a metadata lookup by field name
+                const metadataByField = {};
+                metadataResult.metadata.forEach(field => {
+                    metadataByField[field.field_name] = field;
+                });
+                
+                // Group matrix fields for easier rendering
+                const matrixGroups = {};
+                metadataResult.metadata.forEach(field => {
+                    if (field.grid_name) {
+                        if (!matrixGroups[field.grid_name]) {
+                            matrixGroups[field.grid_name] = {
+                                fields: [],
+                                header: field.grid_name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+                            };
+                        }
+                        matrixGroups[field.grid_name].fields.push(field);
+                    }
+                });
+                
+                // Identify sections for better organization
+                const sections = [];
+                let currentSection = { title: 'General Information', fields: [] };
+                sections.push(currentSection);
+                
+                metadataResult.metadata.forEach(field => {
+                    if (field.field_type === 'section_header') {
+                        currentSection = { title: field.field_label, fields: [] };
+                        sections.push(currentSection);
+                    } else if (!field.grid_name) { // Matrix fields handled separately
+                        currentSection.fields.push(field);
+                    }
+                });
+                
+                // Track which fields have been rendered already (to avoid duplicates from matrices)
+                const renderedFields = new Set();
+                
+                // Process each record
+                dataResult.data.forEach((record, recordIndex) => {
+                    // Add record header if multiple records
+                    if (dataResult.data.length > 1) {
+                        const dateField = record.survey_date || record.survey_timestamp || record.date || '';
+                        surveyHtml += `<div class="redcap-record-header">
+                            <h3><?php echo esc_js(__('Response', 'redcap-patient-portal')); ?> ${recordIndex + 1}</h3>
+                            <div class="redcap-record-date">${dateField ? '<?php echo esc_js(__('Date:', 'redcap-patient-portal')); ?> ' + dateField : ''}</div>
+                        </div>`;
                     }
                     
-                    // Add survey fields (excluding system fields)
-                    const systemFields = ['record_id', 'name_first', 'name_last', 'email', 'survey_date', 'survey_timestamp', 'date'];
-                    
-                    Object.entries(record).forEach(([key, value]) => {
-                        if (!systemFields.includes(key) && value !== null && value !== '') {
-                            // Format the field name for display
-                            const fieldName = key.replace(/_/g, ' ')
-                                .replace(/\b\w/g, letter => letter.toUpperCase());
-                            
-                            surveyHtml += '<div class="redcap-survey-field">' +
-                                '<span class="redcap-field-name">' + fieldName + ':</span> ' +
-                                '<span class="redcap-field-value">' + value + '</span>' +
-                                '</div>';
+                    // Render each section
+                    sections.forEach(section => {
+                        // Skip empty sections
+                        let hasContent = false;
+                        for (const field of section.fields) {
+                            const fieldName = field.field_name;
+                            if (record[fieldName] !== null && record[fieldName] !== '' && 
+                                !renderedFields.has(fieldName) && field.field_type !== 'section_header') {
+                                hasContent = true;
+                                break;
+                            }
                         }
+                        
+                        if (!hasContent) return;
+                        
+                        surveyHtml += `<div class="redcap-section">
+                            <h4 class="redcap-section-title">${section.title}</h4>
+                            <table class="redcap-survey-table">
+                                <thead>
+                                    <tr>
+                                        <th><?php echo esc_js(__('Question', 'redcap-patient-portal')); ?></th>
+                                        <th><?php echo esc_js(__('Response', 'redcap-patient-portal')); ?></th>
+                                    </tr>
+                                </thead>
+                                <tbody>`;
+                        
+                        // Render regular fields in this section
+                        section.fields.forEach(field => {
+                            const fieldName = field.field_name;
+                            
+                            // Skip if already rendered or if it's a section header
+                            if (renderedFields.has(fieldName) || field.field_type === 'section_header') {
+                                return;
+                            }
+                            
+                            // Skip system fields and empty values
+                            const systemFields = ['record_id', 'name_first', 'name_last', 'email', 
+                                                'survey_date', 'survey_timestamp', 'date'];
+                            if (systemFields.includes(fieldName) || 
+                                record[fieldName] === null || 
+                                record[fieldName] === '') {
+                                return;
+                            }
+                            
+                            renderedFields.add(fieldName);
+                            
+                            // Get field information
+                            const questionText = field.field_label || fieldName;
+                            let fieldValue = record[fieldName];
+                            let fieldNote = field.field_note ? `<div class="redcap-field-note">${field.field_note}</div>` : '';
+                            
+                            // Process based on field type
+                            switch (field.field_type) {
+                                case 'yesno':
+                                    fieldValue = fieldValue === '1' ? 'Yes' : 'No';
+                                    break;
+                                    
+                                case 'truefalse':
+                                    fieldValue = fieldValue === '1' ? 'True' : 'False';
+                                    break;
+                                    
+                                case 'radio':
+                                case 'dropdown':
+                                    if (field.select_choices_or_calculations) {
+                                        const choices = field.select_choices_or_calculations.split('|')
+                                            .map(choice => {
+                                                const parts = choice.trim().split(',', 2);
+                                                return {
+                                                    value: parts[0].trim(),
+                                                    label: parts.length > 1 ? parts[1].trim() : parts[0].trim()
+                                                };
+                                            });
+                                        
+                                        const matchingChoice = choices.find(choice => choice.value === fieldValue);
+                                        if (matchingChoice) {
+                                            fieldValue = matchingChoice.label;
+                                        }
+                                    }
+                                    break;
+                                    
+                                case 'checkbox':
+                                    if (field.select_choices_or_calculations) {
+                                        const choices = field.select_choices_or_calculations.split('|')
+                                            .map(choice => {
+                                                const parts = choice.trim().split(',', 2);
+                                                return {
+                                                    value: parts[0].trim(),
+                                                    label: parts.length > 1 ? parts[1].trim() : parts[0].trim()
+                                                };
+                                            });
+                                        
+                                        const selectedValues = [];
+                                        choices.forEach(choice => {
+                                            const checkboxVarName = `${fieldName}___${choice.value}`;
+                                            if (record[checkboxVarName] === '1') {
+                                                selectedValues.push(choice.label);
+                                            }
+                                        });
+                                        fieldValue = selectedValues.join(', ');
+                                    }
+                                    break;
+                                    
+                                case 'file':
+                                    // Create download link for files
+                                    const fileUrl = redcapData.getFileDownloadUrl(record.record_id, fieldName);
+                                    fieldValue = record[fieldName] ? 
+                                        `<a href="${fileUrl}" class="redcap-file-download" target="_blank">
+                                            <i class="fas fa-download"></i> Download File
+                                        </a>` : 'No file uploaded';
+                                    break;
+                                    
+                                case 'calc':
+                                    // Show both formula and result for calculated fields
+                                    fieldNote += field.select_choices_or_calculations ? 
+                                        `<div class="redcap-calc-formula">Formula: ${field.select_choices_or_calculations}</div>` : '';
+                                    break;
+                            }
+                            
+                            // Add to the table
+                            surveyHtml += `<tr class="redcap-survey-field redcap-field-type-${field.field_type}">
+                                <td class="redcap-field-name">
+                                    ${questionText}
+                                    ${field.required_field === 'y' ? '<span class="redcap-required">*</span>' : ''}
+                                    ${fieldNote}
+                                </td>
+                                <td class="redcap-field-value">${fieldValue}</td>
+                            </tr>`;
+                            
+                            // If this field has branching logic, show it
+                            if (field.branching_logic) {
+                                surveyHtml += `<tr class="redcap-branching-logic">
+                                    <td colspan="2" class="redcap-branching-note">
+                                        <i>This question is shown based on previous answers</i>
+                                    </td>
+                                </tr>`;
+                            }
+                        });
+                        
+                        surveyHtml += `</tbody></table></div>`;
                     });
                     
-                    surveyHtml += '</div>';
+                    // Process matrix groups
+                    Object.keys(matrixGroups).forEach(groupName => {
+                        const group = matrixGroups[groupName];
+                        const groupFields = group.fields;
+                        
+                        // Skip if already rendered or no content
+                        if (groupFields.every(field => renderedFields.has(field.field_name))) {
+                            return;
+                        }
+                        
+                        // Check if any field in the matrix has a value
+                        let hasContent = false;
+                        for (const field of groupFields) {
+                            if (record[field.field_name] !== null && record[field.field_name] !== '') {
+                                hasContent = true;
+                                break;
+                            }
+                        }
+                        
+                        if (!hasContent) return;
+                        
+                        // Sort fields to ensure consistent order
+                        groupFields.sort((a, b) => a.field_order - b.field_order);
+                        
+                        // Determine the matrix structure
+                        const matrixHeaders = [];
+                        const matrixRowFields = {};
+                        
+                        groupFields.forEach(field => {
+                            // Mark as rendered
+                            renderedFields.add(field.field_name);
+                            
+                            // Parse the matrix structure from the field name
+                            // Assuming format like matrix_group_name_row_col
+                            const nameParts = field.field_name.split('_');
+                            const lastPart = nameParts[nameParts.length - 1];
+                            
+                            // Extract row identifier (everything except the last part)
+                            const rowId = nameParts.slice(0, -1).join('_');
+                            
+                            if (!matrixRowFields[rowId]) {
+                                matrixRowFields[rowId] = {
+                                    label: field.field_label.split(' - ')[0], // Assumes label format "Row Label - Column Label"
+                                    fields: []
+                                };
+                            }
+                            
+                            // Add to matrix structure
+                            matrixRowFields[rowId].fields.push(field);
+                            
+                            // Extract column header if not already present
+                            const colHeader = field.field_label.split(' - ')[1] || lastPart;
+                            if (!matrixHeaders.includes(colHeader)) {
+                                matrixHeaders.push(colHeader);
+                            }
+                        });
+                        
+                        // Create matrix table
+                        surveyHtml += `<div class="redcap-matrix-group">
+                            <h4 class="redcap-matrix-title">${group.header}</h4>
+                            <table class="redcap-matrix-table">
+                                <thead>
+                                    <tr>
+                                        <th></th>`;
+                        
+                        // Add column headers
+                        matrixHeaders.forEach(header => {
+                            surveyHtml += `<th>${header}</th>`;
+                        });
+                        
+                        surveyHtml += `</tr></thead><tbody>`;
+                        
+                        // Add matrix rows
+                        Object.keys(matrixRowFields).forEach(rowId => {
+                            const rowData = matrixRowFields[rowId];
+                            
+                            surveyHtml += `<tr><td class="redcap-matrix-row-label">${rowData.label}</td>`;
+                            
+                            // Add cells
+                            matrixHeaders.forEach(header => {
+                                // Find the field for this cell
+                                const cell = rowData.fields.find(field => field.field_label.includes(header));
+                                
+                                if (cell) {
+                                    let cellValue = record[cell.field_name] || '';
+                                    
+                                    // Process value based on field type (similar to above but simplified)
+                                    if (cell.field_type === 'radio' && cell.select_choices_or_calculations) {
+                                        const choices = cell.select_choices_or_calculations.split('|')
+                                            .map(choice => {
+                                                const parts = choice.trim().split(',', 2);
+                                                return {
+                                                    value: parts[0].trim(),
+                                                    label: parts.length > 1 ? parts[1].trim() : parts[0].trim()
+                                                };
+                                            });
+                                        
+                                        const matchingChoice = choices.find(choice => choice.value === cellValue);
+                                        if (matchingChoice) {
+                                            cellValue = matchingChoice.label;
+                                        }
+                                    }
+                                    
+                                    surveyHtml += `<td class="redcap-matrix-cell">${cellValue}</td>`;
+                                } else {
+                                    surveyHtml += `<td class="redcap-matrix-cell"></td>`;
+                                }
+                            });
+                            
+                            surveyHtml += `</tr>`;
+                        });
+                        
+                        surveyHtml += `</tbody></table></div>`;
+                    });
                 });
                 
                 surveyHtml += '</div>';
                 
                 // Update survey content
                 $('.redcap-survey-content').html(surveyHtml);
-                debugLog('Survey data loaded successfully');
+                debugLog('Survey data loaded and displayed successfully');
             } else {
                 // No data or error
                 $('.redcap-survey-content').html(
                     '<div class="redcap-message">' +
-                    (result.error || '<?php echo esc_js(__('No survey data available.', 'redcap-patient-portal')); ?>') +
+                    (dataResult.error || '<?php echo esc_js(__('No survey data available.', 'redcap-patient-portal')); ?>') +
                     '</div>'
                 );
-                debugLog('Survey load error: ' + (result.error || 'No data'));
+                debugLog('Survey load error: ' + (dataResult.error || 'No data'));
             }
         } catch (error) {
             $('.redcap-survey-content').html(

@@ -327,3 +327,142 @@
         padding: 0;
     }
 }
+
+/* Basic table styling */
+.redcap-survey-table,
+.redcap-matrix-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    font-size: 14px;
+}
+
+.redcap-survey-table th,
+.redcap-survey-table td,
+.redcap-matrix-table th,
+.redcap-matrix-table td {
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    text-align: left;
+    vertical-align: top;
+}
+
+.redcap-survey-table th,
+.redcap-matrix-table th {
+    background-color: #f5f5f5;
+    font-weight: bold;
+}
+
+/* Alternate row coloring */
+.redcap-survey-table tbody tr:nth-child(even),
+.redcap-matrix-table tbody tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+/* Section styling */
+.redcap-section {
+    margin-bottom: 25px;
+}
+
+.redcap-section-title {
+    background-color: #e9f2f9;
+    padding: 8px 12px;
+    margin: 0 0 10px 0;
+    border-radius: 4px;
+    font-size: 16px;
+    border-left: 4px solid #2196F3;
+}
+
+/* Matrix styling */
+.redcap-matrix-title {
+    background-color: #f0f7ff;
+    padding: 8px 12px;
+    margin: 0 0 10px 0;
+    border-radius: 4px;
+    font-size: 16px;
+    border-left: 4px solid #673AB7;
+}
+
+.redcap-matrix-row-label {
+    font-weight: bold;
+    background-color: #f9f9f9;
+}
+
+/* Field-specific styling */
+.redcap-field-note {
+    font-size: 12px;
+    color: #666;
+    margin-top: 4px;
+    font-style: italic;
+}
+
+.redcap-calc-formula {
+    font-size: 12px;
+    color: #0288D1;
+    margin-top: 4px;
+    font-family: monospace;
+    background-color: #f5f5f5;
+    padding: 4px;
+    border-radius: 3px;
+}
+
+.redcap-required {
+    color: #F44336;
+    margin-left: 3px;
+}
+
+.redcap-branching-logic {
+    background-color: #FFFDE7;
+}
+
+.redcap-branching-note {
+    font-size: 12px;
+    color: #9E9E9E;
+    text-align: right;
+    padding: 4px 12px;
+}
+
+/* File download styling */
+.redcap-file-download {
+    display: inline-block;
+    padding: 6px 12px;
+    background-color: #4CAF50;
+    color: white;
+    border-radius: 4px;
+    text-decoration: none;
+}
+
+.redcap-file-download:hover {
+    background-color: #388E3C;
+    text-decoration: none;
+}
+
+/* Record header styling */
+.redcap-record-header {
+    padding: 10px;
+    margin: 20px 0;
+    background-color: #f5f5f5;
+    border-radius: 4px;
+    border-left: 5px solid #FF9800;
+}
+
+.redcap-record-header h3 {
+    margin: 0 0 5px 0;
+    font-size: 18px;
+}
+
+.redcap-record-date {
+    font-size: 14px;
+    color: #666;
+}
+
+/* Field type specific styling */
+.redcap-field-type-calc .redcap-field-value {
+    font-weight: bold;
+    color: #0288D1;
+}
+
+.redcap-field-type-yesno .redcap-field-value,
+.redcap-field-type-truefalse .redcap-field-value {
+    font-weight: bold;
+}
