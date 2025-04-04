@@ -163,3 +163,11 @@ For more detailed debugging:
 4. Regularly audit access logs
 5. Consider IP restrictions for the middleware server
 
+
+## TODO
+- Auto-populate `wp_redcap` table, rather than relying on admins to manually add new users via admin-gated registration action, then...
+- Only allow patient portal auth login for users who actually have redcap records
+- Add rate limiting
+- Improve record display for users
+- Allow multiple redcap projects to be displayed for users
+
