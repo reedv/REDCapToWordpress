@@ -107,6 +107,90 @@ def token_required(f):
         return f(user_email=user_email, *args, **kwargs)
     return decorated
 
+# participant self-registration validation endpoint
+@app.route('/verify_participant', methods=['POST'])
+def verify_participant():
+    """
+    Verify if a user exists in REDCap with the provided email, first name, and last name.
+    This endpoint is used during self-registration to confirm study participation.
+    """
+    try:
+        # Extract request data
+        data = request.get_json()
+        if not data:
+            logger.warning("No JSON data received in verification request")
+            return jsonify({
+                'message': 'No verification data provided',
+                'verified': False
+            }), 400
+
+        # Log sanitized data
+        logger.info(f"Verification attempt for email: {data.get('email', 'N/A')}")
+
+        # Validate required fields
+        required_fields = ['email', 'first_name', 'last_name']
+        for field in required_fields:
+            if field not in data or not data[field]:
+                logger.warning(f"Missing {field} in verification request")
+                return jsonify({
+                    'message': f'Missing {field}',
+                    'verified': False
+                }), 400
+
+        # Query REDCap to check if the participant exists
+        redcap_data = {
+            'token': REDCAP_API_TOKEN,
+            'content': 'record',
+            'format': 'json',
+            'type': 'flat',
+            'filterLogic': f"[email] = '{data['email']}' AND [self_consent_first_name] = '{data['first_name']}' AND [self_consent_last_name] = '{data['last_name']}'",
+            'returnFormat': 'json'
+        }
+        
+        redcap_response = requests.post(REDCAP_API_URL, data=redcap_data)  ## Including arg verify=False for debugging/dev runs if redcap_url having SSL issues
+        
+        if redcap_response.status_code != 200:
+            logger.error(f"REDCap API error: {redcap_response.text}")
+            return jsonify({
+                'message': 'Error checking REDCap records',
+                'verified': False
+            }), 500
+            
+        records = redcap_response.json()
+        
+        # Double-check that the record matches our criteria
+        # This is an extra security measure
+        verified_records = []
+        for record in records:
+            if (record.get('email') == data['email'] and 
+                record.get('self_consent_first_name') == data['first_name'] and 
+                record.get('self_consent_last_name') == data['last_name']):
+                verified_records.append(record)
+        
+        if not verified_records:
+            logger.info(f"No matching records found for {data['email']}")
+            return jsonify({
+                'verified': False,
+                'message': 'No matching participant record found'
+            }), 200
+            
+        # Return success with record ID
+        record_id = verified_records[0].get('record_id')
+        logger.info(f"Participant verified: {data['email']} with record ID {record_id}")
+        return jsonify({
+            'verified': True,
+            'record_id': record_id,
+            'message': 'Participant verified successfully'
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Unexpected error during verification: {str(e)}")
+        logger.error(traceback.format_exc())
+        return jsonify({
+            'verified': False,
+            'message': 'Internal verification error'
+        }), 500
+
 # WordPress authentication endpoint
 @app.route('/auth/wordpress', methods=['POST'])
 def wordpress_auth():

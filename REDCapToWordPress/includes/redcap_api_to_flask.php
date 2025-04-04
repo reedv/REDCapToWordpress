@@ -6,6 +6,53 @@
  * I'm sorry this isn't easier :( . I'll try to automate this process.
  */
 
+/**
+ * Verify a participant against REDCap records via middleware
+ *
+ * @param string $email The participant's email address
+ * @param string $first_name The participant's first name
+ * @param string $last_name The participant's last name
+ * @return array Response with verification status and record_id if verified
+ */
+function verify_participant($email, $first_name, $last_name) {
+    $configs = parse_ini_file(dirname(__FILE__, $levels=2) . "/config.ini");
+    
+    $data = array(
+        'email' => $email,
+        'first_name' => $first_name,
+        'last_name' => $last_name
+    );
+    
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $configs['middleman_url'] . '/verify_participant');
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_VERBOSE, 0);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_AUTOREFERER, true);
+    curl_setopt($ch, CURLOPT_MAXREDIRS, 10);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+    curl_setopt($ch, CURLOPT_FRESH_CONNECT, 1);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+    
+    $output = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    $response = json_decode($output, true);
+    
+    if ($http_code != 200 || !$response) {
+        return array(
+            'verified' => false,
+            'message' => 'Failed to verify participant information. Please try again.',
+            'error' => $http_code
+        );
+    }
+    
+    return $response;
+}
+
 function request_data($record_id){
     $configs = parse_ini_file(dirname(__FILE__, $levels=2) . "/config.ini");
 

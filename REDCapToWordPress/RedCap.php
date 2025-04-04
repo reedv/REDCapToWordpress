@@ -37,6 +37,7 @@ class REDCap_Patient_Portal {
         // Add shortcodes
         add_shortcode('redcap_portal', array($this, 'portal_shortcode'));
         add_shortcode('redcap_login', array($this, 'login_shortcode'));
+        add_shortcode('redcap_registration', array($this, 'registration_shortcode'));
         
         // Enqueue scripts and styles
         add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
@@ -48,6 +49,10 @@ class REDCap_Patient_Portal {
         // Add settings page
         add_action('admin_menu', array($this, 'add_admin_menu'));
         add_action('admin_init', array($this, 'register_settings'));
+
+        // Add the AJAX handler for self-registration
+        add_action('wp_ajax_nopriv_redcap_verify_and_register', array($this, 'ajax_verify_and_register'));
+        add_action('wp_ajax_redcap_verify_and_register', array($this, 'ajax_verify_and_register'));
     }
     
     /**
@@ -102,11 +107,12 @@ class REDCap_Patient_Portal {
      * Enqueue necessary scripts and styles
      */
     public function enqueue_scripts() {
-        // Only enqueue on pages that use our shortcodes
+        // Only enqueue on pages that use our shortcodes (shortcodes not enqueued here will have "jQuery not defined" issues)
         global $post;
         if (is_a($post, 'WP_Post') && 
             (has_shortcode($post->post_content, 'redcap_portal') || 
-             has_shortcode($post->post_content, 'redcap_login'))) {
+             has_shortcode($post->post_content, 'redcap_login') ||
+             has_shortcode($post->post_content, 'redcap_registration'))) {
             
             // Enqueue the auth and data-access JS
             wp_enqueue_script(
@@ -140,6 +146,112 @@ class REDCap_Patient_Portal {
                 REDCAP_PORTAL_VERSION
             );
         }
+    }
+
+    /**
+     * AJAX handler to verify self-registering participant and register them in the wp site
+     */
+    public function ajax_verify_and_register() {
+        check_ajax_referer('redcap_participant_registration_nonce', 'nonce');
+        
+        // Validate input fields
+        $email = isset($_POST['email']) ? sanitize_email($_POST['email']) : '';
+        $first_name = isset($_POST['first_name']) ? sanitize_text_field($_POST['first_name']) : '';
+        $last_name = isset($_POST['last_name']) ? sanitize_text_field($_POST['last_name']) : '';
+        $username = isset($_POST['username']) ? sanitize_user($_POST['username']) : '';
+        $redirect_url = isset($_POST['redirect_url']) ? esc_url_raw($_POST['redirect_url']) : '';
+        
+        // Check for required fields
+        if (empty($email) || empty($first_name) || empty($last_name) || empty($username)) {
+            wp_send_json_error(array(
+                'message' => __('All fields are required.', 'redcap-patient-portal')
+            ));
+            return;
+        }
+        
+        // Check if username is valid
+        if (!validate_username($username)) {
+            wp_send_json_error(array(
+                'message' => __('Invalid username. Please choose a different one.', 'redcap-patient-portal')
+            ));
+            return;
+        }
+        
+        // Check if username already exists
+        if (username_exists($username)) {
+            wp_send_json_error(array(
+                'message' => __('This username is already taken. Please choose a different one.', 'redcap-patient-portal')
+            ));
+            return;
+        }
+        
+        // Check if email already exists in WordPress
+        if (email_exists($email)) {
+            wp_send_json_error(array(
+                'message' => __('An account with this email already exists. Please log in or reset your password.', 'redcap-patient-portal')
+            ));
+            return;
+        }
+        
+        // Include the middleware client function
+        require_once(REDCAP_PORTAL_PATH . 'includes/redcap_api_to_flask.php');
+        
+        // Verify against REDCap via middleware
+        $verification = verify_participant($email, $first_name, $last_name);
+        
+        if (!$verification['verified']) {
+            wp_send_json_error(array(
+                'message' => __('We could not verify your information against our study records. Please check that you entered the exact name and email used in the study.', 'redcap-patient-portal')
+            ));
+            return;
+        }
+        
+        // At this point, the participant is verified!
+        // Extract record_id from verification response
+        $record_id = isset($verification['record_id']) ? sanitize_text_field($verification['record_id']) : '';
+        
+        if (empty($record_id)) {
+            wp_send_json_error(array(
+                'message' => __('Record ID is missing. Please contact support.', 'redcap-patient-portal')
+            ));
+            return;
+        }
+        
+        // Generate random password
+        $user_pass = wp_generate_password();
+        
+        // Create the user account
+        $new_user_id = wp_insert_user(array(
+            'user_login' => $username,
+            'user_pass' => $user_pass,
+            'user_email' => $email,
+            'first_name' => $first_name,
+            'last_name' => $last_name,
+            'user_registered' => date('Y-m-d H:i:s'),
+            'role' => 'subscriber'
+        ));
+        
+        if (is_wp_error($new_user_id)) {
+            wp_send_json_error(array(
+                'message' => __('Error creating user account: ', 'redcap-patient-portal') . $new_user_id->get_error_message()
+            ));
+            return;
+        }
+        
+        // Add user to the wp_redcap table
+        insert_data_redcap($email, $record_id);
+        
+        // Send password setup email
+        $user = get_user_by('id', $new_user_id);
+        
+        // Send verification email for password setup
+        wp_new_user_notification($new_user_id, null, 'user');
+        
+        // Return success
+        wp_send_json_success(array(
+            'message' => __('Registration successful! Please check your email for instructions to set your password.', 'redcap-patient-portal'),
+            'redirect' => $redirect_url
+        ));
     }
     
     /**
@@ -186,6 +298,20 @@ class REDCap_Patient_Portal {
                 'error' => $error_type
             ));
         }
+    }
+
+    /**
+     * Shortcode to display self-registration form
+     * Usage: [redcap_registration redirect="/my-data"]
+     */
+    public function registration_shortcode($atts) {
+        $atts = shortcode_atts(array(
+            'redirect' => '',
+        ), $atts, 'redcap_registration');
+        
+        ob_start();
+        include(REDCAP_PORTAL_PATH . 'templates/participant-registration.php');
+        return ob_get_clean();
     }
     
     /**
@@ -313,6 +439,7 @@ class REDCap_Patient_Portal {
             
             <div class="card">
                 <h2>Shortcode Usage</h2>
+                <p><strong>[redcap_registration redirect="/my-data"]</strong> - Shortcode to display self-registration form</p>
                 <p><strong>[redcap_login redirect_url="/my-data"]</strong> - Displays login form with optional redirect</p>
                 <p><strong>[redcap_portal survey="medication_survey"]</strong> - Displays patient data with optional survey filter</p>
             </div>
@@ -327,6 +454,7 @@ class REDCap_Patient_Portal {
         <?php
     }
 }
+
 
 add_action('rest_api_init', function () {
     register_rest_route('redcap-portal/v1', '/authenticate', array(
