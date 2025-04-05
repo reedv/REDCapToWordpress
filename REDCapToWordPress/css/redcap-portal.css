@@ -1,20 +1,14 @@
 /* REDCap Patient Portal Styles */
 
-/* Container */
+/* ====== Base Styles ====== */
 .redcap-portal-container {
-    margin: 20px 0;
+    max-width: 1200px;
+    width: 80%;
+    margin: 20px auto;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
 }
 
-/* Make survey container and table wider */
-.redcap-portal-container {
-    max-width: 1200px; /* Increase this value as needed */
-    margin-left: auto;
-    margin-right: auto;
-    width: 80%; /* Use most of the available width */
-}
-
-/* Sections */
+/* ====== Section Styles ====== */
 .redcap-portal-section {
     margin-bottom: 30px;
     padding: 20px;
@@ -23,7 +17,8 @@
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
-.redcap-section-title {
+.redcap-section-title, 
+.redcap-section .redcap-section-title {
     margin-top: 0;
     margin-bottom: 20px;
     padding-bottom: 10px;
@@ -32,7 +27,20 @@
     color: #333;
 }
 
-/* Forms */
+.redcap-section {
+    margin-bottom: 25px;
+}
+
+.redcap-section .redcap-section-title {
+    background-color: #f5f5f5;
+    padding: 8px 12px;
+    margin: 0 0 10px 0;
+    border-radius: 4px;
+    font-size: 16px;
+    border-bottom: none;
+}
+
+/* ====== Form Styles ====== */
 .redcap-form {
     max-width: 500px;
 }
@@ -65,7 +73,7 @@
     flex-wrap: wrap;
 }
 
-/* Buttons */
+/* ====== Button Styles ====== */
 .redcap-button {
     padding: 10px 20px;
     border-radius: 4px;
@@ -98,7 +106,7 @@
     color: #1d2327;
 }
 
-/* Links */
+/* ====== Link Styles ====== */
 .redcap-register-link,
 .redcap-forgot-password-link {
     font-size: 14px;
@@ -112,7 +120,7 @@
     text-decoration: underline;
 }
 
-/* Messages */
+/* ====== Message Styles ====== */
 .redcap-message,
 .redcap-error-message,
 .redcap-success-message,
@@ -146,7 +154,7 @@
     color: #856404;
 }
 
-/* Loading Spinner */
+/* ====== Loading Spinner ====== */
 .redcap-loading {
     display: flex;
     flex-direction: column;
@@ -170,7 +178,7 @@
     100% { transform: rotate(360deg); }
 }
 
-/* Data Presentation */
+/* ====== Data Presentation ====== */
 .redcap-profile-details,
 .redcap-survey-results,
 .redcap-all-data-container {
@@ -194,13 +202,16 @@
 .redcap-field-name {
     font-weight: 600;
     margin-right: 5px;
+    width: 40%;
 }
 
 .redcap-field-value {
     word-break: break-word;
+    width: 60%;
+    white-space: pre-wrap;
 }
 
-/* Survey Results */
+/* ====== Survey Results ====== */
 .redcap-survey-record {
     margin-bottom: 20px;
     padding-bottom: 20px;
@@ -217,22 +228,47 @@
     margin-bottom: 10px;
 }
 
-/* Data Table */
-.redcap-data-table {
+/* ====== Record Header ====== */
+.redcap-record-header {
+    padding: 10px;
+    margin: 20px 0;
+    background-color: #f5f5f5;
+    border-radius: 4px;
+    border-left: 5px solid #FF9800;
+}
+
+.redcap-record-header h3 {
+    margin: 0 0 5px 0;
+    font-size: 18px;
+}
+
+/* ====== Table Styles ====== */
+/* Common table properties */
+.redcap-data-table,
+.redcap-survey-table,
+.redcap-matrix-table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 15px;
-    margin-bottom: 15px;
+    margin: 15px 0 20px;
+    table-layout: fixed;
 }
 
 .redcap-data-table th,
-.redcap-data-table td {
+.redcap-data-table td,
+.redcap-survey-table th,
+.redcap-survey-table td,
+.redcap-matrix-table th,
+.redcap-matrix-table td {
     padding: 12px 15px;
     text-align: left;
-    border-bottom: 1px solid #ddd;
+    border: 1px solid #ddd;
+    vertical-align: top;
+    word-wrap: break-word;
 }
 
-.redcap-data-table th {
+.redcap-data-table th,
+.redcap-survey-table th,
+.redcap-matrix-table th {
     background-color: #f8f9fa;
     font-weight: 600;
 }
@@ -241,163 +277,34 @@
     background-color: #f5f5f5;
 }
 
+/* Survey table specific */
+.redcap-survey-table td.redcap-field-name {
+    width: 50%;
+    text-align: left;
+    vertical-align: top;
+    font-weight: normal;
+}
+
+.redcap-survey-table td.redcap-field-value {
+    width: 50%;
+    text-align: left;
+    vertical-align: top;
+}
+
+.redcap-survey-table .redcap-survey-field td {
+    text-align: left !important;
+}
+
 .redcap-data-summary {
     margin-bottom: 15px;
     font-style: italic;
     color: #666;
 }
 
-/* Record Details */
-.redcap-record-details {
-    margin-top: 20px;
-    padding: 20px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    background-color: #f9f9f9;
-}
-
-.redcap-details-content {
-    margin-bottom: 15px;
-    max-height: 400px;
-    overflow-y: auto;
-    padding-right: 10px;
-}
-
-/* Debug Section */
-.redcap-debug-section {
-    margin-top: 40px;
-    padding: 15px;
-    background-color: #f8f9fa;
-    border-left: 4px solid #6c757d;
-}
-
-.redcap-debug-content {
-    font-family: monospace;
-    font-size: 14px;
-    line-height: 1.5;
-    max-height: 300px;
-    overflow-y: auto;
-}
-
-#redcap-debug-log {
-    margin-top: 10px;
-    padding: 10px;
-    background-color: #343a40;
-    color: #f8f9fa;
-    border-radius: 4px;
-}
-
-.debug-item {
-    margin-bottom: 5px;
-    padding-bottom: 5px;
-    border-bottom: 1px solid #495057;
-}
-
-/* Responsive Adjustments */
-@media (max-width: 768px) {
-    .redcap-form-actions {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-    
-    .redcap-button {
-        margin-bottom: 10px;
-    }
-    
-    .redcap-data-table th,
-    .redcap-data-table td {
-        padding: 8px 10px;
-    }
-}
-
-/* Print Styles */
-@media print {
-    .redcap-portal-container {
-        margin: 0;
-    }
-    
-    .redcap-portal-section {
-        box-shadow: none;
-        border: 1px solid #ddd;
-        page-break-inside: avoid;
-    }
-    
-    .redcap-button,
-    .redcap-portal-actions,
-    .redcap-view-details,
-    .redcap-close-details {
-        display: none !important;
-    }
-    
-    .redcap-record-details {
-        display: block !important;
-        border: none;
-        padding: 0;
-    }
-}
-
-/* Basic table styling */
-.redcap-survey-table,
-.redcap-matrix-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 20px;
-    font-size: 14px;
-    table-layout: fixed;
-}
-
-.redcap-survey-table th,
-.redcap-survey-table td,
-.redcap-matrix-table th,
-.redcap-matrix-table td {
-    padding: 10px 12px;
-    border: 1px solid #ddd;
-    text-align: left;
-    vertical-align: top;
-    word-wrap: break-word;
-}
-
-/* Column widths for better readability */
-.redcap-field-name {
-    width: 40%;
-}
-
-.redcap-field-value {
-    width: 60%;
-}
-
-/* Section styling */
-.redcap-section {
-    margin-bottom: 25px;
-}
-
-.redcap-section-title {
-    background-color: #f5f5f5;
-    padding: 8px 12px;
-    margin: 0 0 10px 0;
-    border-radius: 4px;
-    font-size: 16px;
-}
-
-/* Matrix styling */
+/* ====== Matrix Styles ====== */
 .redcap-matrix-group {
     margin-bottom: 25px;
-    overflow-x: auto; /* Allows horizontal scrolling for wide matrices */
-}
-
-/* Responsive adjustments */
-@media screen and (max-width: 768px) {
-    .redcap-survey-table, 
-    .redcap-matrix-table {
-        font-size: 13px;
-    }
-    
-    .redcap-survey-table th,
-    .redcap-survey-table td,
-    .redcap-matrix-table th,
-    .redcap-matrix-table td {
-        padding: 8px 6px;
-    }
+    overflow-x: auto;
 }
 
 .redcap-matrix-row-label {
@@ -405,7 +312,7 @@
     background-color: #f9f9f9;
 }
 
-/* Field-specific styling */
+/* ====== Field-specific styling ====== */
 .redcap-field-note {
     font-size: 12px;
     color: #666;
@@ -439,7 +346,17 @@
     padding: 4px 12px;
 }
 
-/* File download styling */
+.redcap-field-type-calc .redcap-field-value {
+    font-weight: bold;
+    color: #0288D1;
+}
+
+.redcap-field-type-yesno .redcap-field-value,
+.redcap-field-type-truefalse .redcap-field-value {
+    font-weight: bold;
+}
+
+/* ====== File download styling ====== */
 .redcap-file-download {
     display: inline-block;
     padding: 6px 12px;
@@ -454,79 +371,102 @@
     text-decoration: none;
 }
 
-/* Record header styling */
-.redcap-record-header {
-    padding: 10px;
-    margin: 20px 0;
-    background-color: #f5f5f5;
-    border-radius: 4px;
-    border-left: 5px solid #FF9800;
-}
-
-.redcap-record-header h3 {
-    margin: 0 0 5px 0;
-    font-size: 18px;
-}
-
-.redcap-record-date {
-    font-size: 14px;
-    color: #666;
-}
-
-/* Field type specific styling */
-.redcap-field-type-calc .redcap-field-value {
-    font-weight: bold;
-    color: #0288D1;
-}
-
-.redcap-field-type-yesno .redcap-field-value,
-.redcap-field-type-truefalse .redcap-field-value {
-    font-weight: bold;
-}
-
-/* Fix survey table structure */
-.redcap-survey-table {
-    width: 100%;
-    table-layout: fixed;
-    border-collapse: collapse;
-    margin-bottom: 20px;
-}
-
-/* Override the existing .redcap-field-name and .redcap-field-value for table cells specifically */
-.redcap-survey-table td.redcap-field-name {
-    width: 50%;
-    text-align: left;
-    vertical-align: top;
-    font-weight: normal;
-}
-
-.redcap-survey-table td.redcap-field-value {
-    width: 50%;
-    text-align: left;
-    vertical-align: top;
-}
-
-/* Fix header alignment */
-.redcap-survey-table th {
-    text-align: left;
-    background-color: #f5f5f5;
-}
-
-/* Add proper spacing */
-.redcap-survey-table th,
-.redcap-survey-table td {
-    padding: 12px;
+/* ====== Record Details ====== */
+.redcap-record-details {
+    margin-top: 20px;
+    padding: 20px;
     border: 1px solid #ddd;
-    word-wrap: break-word;
+    border-radius: 5px;
+    background-color: #f9f9f9;
 }
 
-/* Center alignment fix */
-.redcap-survey-table .redcap-survey-field td {
-    text-align: left !important;
+.redcap-details-content {
+    margin-bottom: 15px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 10px;
 }
 
-/* Value formatting for responses */
-.redcap-survey-table .redcap-field-value {
-    white-space: pre-wrap;
-    word-break: break-word;
+/* ====== Debug Section ====== */
+.redcap-debug-section {
+    margin-top: 40px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-left: 4px solid #6c757d;
+}
+
+.redcap-debug-content {
+    font-family: monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+#redcap-debug-log {
+    margin-top: 10px;
+    padding: 10px;
+    background-color: #343a40;
+    color: #f8f9fa;
+    border-radius: 4px;
+}
+
+.debug-item {
+    margin-bottom: 5px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #495057;
+}
+
+/* ====== Responsive Adjustments ====== */
+@media (max-width: 768px) {
+    .redcap-form-actions {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .redcap-button {
+        margin-bottom: 10px;
+    }
+    
+    .redcap-data-table th,
+    .redcap-data-table td,
+    .redcap-survey-table th,
+    .redcap-survey-table td,
+    .redcap-matrix-table th,
+    .redcap-matrix-table td {
+        padding: 8px 6px;
+    }
+    
+    .redcap-survey-table,
+    .redcap-matrix-table {
+        font-size: 13px;
+    }
+}
+
+/* ====== Print Styles ====== */
+@media print {
+    .redcap-portal-container {
+        margin: 0;
+        width: 100%;
+        max-width: none;
+    }
+    
+    .redcap-portal-section {
+        box-shadow: none;
+        border: 1px solid #ddd;
+        page-break-inside: avoid;
+    }
+    
+    .redcap-button,
+    .redcap-portal-actions,
+    .redcap-view-details,
+    .redcap-close-details {
+        display: none !important;
+    }
+    
+    .redcap-record-details {
+        display: block !important;
+        border: none;
+        padding: 0;
+    }
 }
