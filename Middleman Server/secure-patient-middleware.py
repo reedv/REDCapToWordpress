@@ -147,7 +147,7 @@ def verify_participant():
             'returnFormat': 'json'
         }
         
-        redcap_response = requests.post(REDCAP_API_URL, data=redcap_data, verify=False)  ## Including arg verify=False for debugging/dev runs if redcap_url having SSL issues
+        redcap_response = requests.post(REDCAP_API_URL, data=redcap_data)  ## Including arg verify=False for debugging/dev runs if redcap_url having SSL issues
         
         if redcap_response.status_code != 200:
             logger.error(f"REDCap API error: {redcap_response.text}")
@@ -388,7 +388,7 @@ def get_patient_data(user_email):
         
         # Replace 'email' with your actual REDCap email field name
         
-        redcap_response = requests.post(REDCAP_API_URL, data=data, verify=False)  ## If having SSL cert issues with redcap_url, can add arg verify=False to this call for debugging.
+        redcap_response = requests.post(REDCAP_API_URL, data=data)  ## If having SSL cert issues with redcap_url, can add arg verify=False to this call for debugging.
         app.logger.info(f"REDCap raw response: {redcap_response.text[:200]}...")  # Log first 200 chars
         
         if redcap_response.status_code != 200:
@@ -435,7 +435,7 @@ def get_survey_results(user_email, survey_name):
             'returnFormat': 'json'
         }
         
-        redcap_response = requests.post(REDCAP_API_URL, data=data, verify=False)
+        redcap_response = requests.post(REDCAP_API_URL, data=data)
         
         if redcap_response.status_code != 200:
             app.logger.error(f"REDCap API error: {redcap_response.text}")
@@ -472,7 +472,7 @@ def get_survey_metadata(user_email, survey_name):
             'returnFormat': 'json'
         }
         
-        metadata_response = requests.post(REDCAP_API_URL, data=metadata_data, verify=False)
+        metadata_response = requests.post(REDCAP_API_URL, data=metadata_data)
         
         if metadata_response.status_code != 200:
             logger.error(f"REDCap API error (metadata): {metadata_response.text}")
@@ -488,7 +488,7 @@ def get_survey_metadata(user_email, survey_name):
             'returnFormat': 'json'
         }
         
-        instrument_response = requests.post(REDCAP_API_URL, data=instrument_data, verify=False)
+        instrument_response = requests.post(REDCAP_API_URL, data=instrument_data)
         
         if instrument_response.status_code != 200:
             logger.error(f"REDCap API error (instrument): {instrument_response.text}")
@@ -506,7 +506,7 @@ def get_survey_metadata(user_email, survey_name):
                 'returnFormat': 'json'
             }
             
-            mapping_response = requests.post(REDCAP_API_URL, data=mapping_data, verify=False)
+            mapping_response = requests.post(REDCAP_API_URL, data=mapping_data)
             
             if mapping_response.status_code == 200:
                 formEventMapping = mapping_response.json()
@@ -531,7 +531,7 @@ def get_survey_metadata(user_email, survey_name):
                     'returnFormat': 'json'
                 }
                 
-                verification_response = requests.post(REDCAP_API_URL, data=verification_data, verify=False)
+                verification_response = requests.post(REDCAP_API_URL, data=verification_data)
                 
                 if verification_response.status_code != 200:
                     return jsonify({'message': 'Error verifying record access'}), 500
@@ -551,7 +551,7 @@ def get_survey_metadata(user_email, survey_name):
                     'returnFormat': 'json'
                 }
                 
-                file_response = requests.post(REDCAP_API_URL, data=file_data, verify=False)
+                file_response = requests.post(REDCAP_API_URL, data=file_data)
                 
                 if file_response.status_code != 200:
                     return jsonify({'message': 'Error retrieving file'}), 500
