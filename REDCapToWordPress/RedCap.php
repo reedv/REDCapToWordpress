@@ -143,7 +143,7 @@ class REDCap_Patient_Portal {
                 'redcap-portal-styles',
                 REDCAP_PORTAL_URL . 'css/redcap-portal.css',
                 array(),
-                REDCAP_PORTAL_VERSION
+                REDCAP_PORTAL_VERSION . '.' . time(), // Force cache refresh with timestamp, wp site was caching this in internal asset cache and not using updated versions even after installing new plugin zip or clearing browser cache
             );
         }
     }

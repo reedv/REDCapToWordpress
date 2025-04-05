@@ -301,10 +301,14 @@ jQuery(document).ready(function($) {
                         surveyHtml += `<div class="redcap-section">
                             <h4 class="redcap-section-title">${section.title}</h4>
                             <table class="redcap-survey-table">
+                                <colgroup>
+                                    <col style="width:50%">
+                                    <col style="width:50%">
+                                </colgroup>
                                 <thead>
                                     <tr>
-                                        <th><?php echo esc_js(__('Question', 'redcap-patient-portal')); ?></th>
-                                        <th><?php echo esc_js(__('Response', 'redcap-patient-portal')); ?></th>
+                                        <th scope="col"><?php echo esc_js(__('Question', 'redcap-patient-portal')); ?></th>
+                                        <th scope="col"><?php echo esc_js(__('Response', 'redcap-patient-portal')); ?></th>
                                     </tr>
                                 </thead>
                                 <tbody>`;
@@ -334,6 +338,11 @@ jQuery(document).ready(function($) {
                             let fieldValue = record[fieldName];
                             let fieldNote = field.field_note ? `<div class="redcap-field-note">${field.field_note}</div>` : '';
                             
+                            // null/undefined handling
+                            if (fieldValue === null || fieldValue === undefined) {
+                                fieldValue = '';  // Replace with empty string instead of showing "undefined"
+                            }
+
                             // Process based on field type
                             switch (field.field_type) {
                                 case 'yesno':

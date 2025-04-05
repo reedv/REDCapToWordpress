@@ -6,6 +6,14 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
 }
 
+/* Make survey container and table wider */
+.redcap-portal-container {
+    max-width: 1200px; /* Increase this value as needed */
+    margin-left: auto;
+    margin-right: auto;
+    width: 80%; /* Use most of the available width */
+}
+
 /* Sections */
 .redcap-portal-section {
     margin-bottom: 30px;
@@ -335,6 +343,7 @@
     border-collapse: collapse;
     margin-bottom: 20px;
     font-size: 14px;
+    table-layout: fixed;
 }
 
 .redcap-survey-table th,
@@ -345,18 +354,16 @@
     border: 1px solid #ddd;
     text-align: left;
     vertical-align: top;
+    word-wrap: break-word;
 }
 
-.redcap-survey-table th,
-.redcap-matrix-table th {
-    background-color: #f5f5f5;
-    font-weight: bold;
+/* Column widths for better readability */
+.redcap-field-name {
+    width: 40%;
 }
 
-/* Alternate row coloring */
-.redcap-survey-table tbody tr:nth-child(even),
-.redcap-matrix-table tbody tr:nth-child(even) {
-    background-color: #f9f9f9;
+.redcap-field-value {
+    width: 60%;
 }
 
 /* Section styling */
@@ -365,22 +372,32 @@
 }
 
 .redcap-section-title {
-    background-color: #e9f2f9;
+    background-color: #f5f5f5;
     padding: 8px 12px;
     margin: 0 0 10px 0;
     border-radius: 4px;
     font-size: 16px;
-    border-left: 4px solid #2196F3;
 }
 
 /* Matrix styling */
-.redcap-matrix-title {
-    background-color: #f0f7ff;
-    padding: 8px 12px;
-    margin: 0 0 10px 0;
-    border-radius: 4px;
-    font-size: 16px;
-    border-left: 4px solid #673AB7;
+.redcap-matrix-group {
+    margin-bottom: 25px;
+    overflow-x: auto; /* Allows horizontal scrolling for wide matrices */
+}
+
+/* Responsive adjustments */
+@media screen and (max-width: 768px) {
+    .redcap-survey-table, 
+    .redcap-matrix-table {
+        font-size: 13px;
+    }
+    
+    .redcap-survey-table th,
+    .redcap-survey-table td,
+    .redcap-matrix-table th,
+    .redcap-matrix-table td {
+        padding: 8px 6px;
+    }
 }
 
 .redcap-matrix-row-label {
@@ -465,4 +482,51 @@
 .redcap-field-type-yesno .redcap-field-value,
 .redcap-field-type-truefalse .redcap-field-value {
     font-weight: bold;
+}
+
+/* Fix survey table structure */
+.redcap-survey-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+}
+
+/* Override the existing .redcap-field-name and .redcap-field-value for table cells specifically */
+.redcap-survey-table td.redcap-field-name {
+    width: 50%;
+    text-align: left;
+    vertical-align: top;
+    font-weight: normal;
+}
+
+.redcap-survey-table td.redcap-field-value {
+    width: 50%;
+    text-align: left;
+    vertical-align: top;
+}
+
+/* Fix header alignment */
+.redcap-survey-table th {
+    text-align: left;
+    background-color: #f5f5f5;
+}
+
+/* Add proper spacing */
+.redcap-survey-table th,
+.redcap-survey-table td {
+    padding: 12px;
+    border: 1px solid #ddd;
+    word-wrap: break-word;
+}
+
+/* Center alignment fix */
+.redcap-survey-table .redcap-survey-field td {
+    text-align: left !important;
+}
+
+/* Value formatting for responses */
+.redcap-survey-table .redcap-field-value {
+    white-space: pre-wrap;
+    word-break: break-word;
 }
