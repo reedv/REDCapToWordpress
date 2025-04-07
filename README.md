@@ -260,3 +260,39 @@ For more detailed debugging:
 4. Regularly audit access logs
 5. Consider IP restrictions for the middleware server
 
+
+## ⚠️ IMPORTANT DISCLAIMER ⚠️
+
+### HIPAA Compliance Notice
+
+This software is provided as-is without any warranties or guarantees of HIPAA compliance. While best efforts have been made to implement security practices that align with HIPAA requirements:
+
+- No formal HIPAA compliance audit has been performed on this codebase
+- Implementation of this software does not automatically make your system HIPAA compliant
+- The responsibility for ensuring HIPAA compliance rests with your organization
+- You should conduct your own security assessment before using in production
+
+### Security Limitations
+
+The developer(s) of this software:
+
+- Make no guarantees about the complete or reasonable cybersecurity of this system
+- Are not liable for any data breaches or security incidents that may result from its use
+- Recommend thorough testing and security auditing before implementation
+- Cannot be held responsible for improper configuration or deployment
+
+### Best Practices
+
+If you intend to use this software with protected health information (PHI):
+
+1. Have qualified security personnel review the codebase
+2. Implement proper access controls and audit logging
+3. Ensure secure network configuration and HTTPS
+4. Consider a formal security assessment
+5. Document your compliance measures
+6. Maintain regular security updates
+
+## Use At Your Own Risk
+
+By using this software, you acknowledge that you understand these limitations and accept full responsibility for ensuring that your implementation meets all applicable security and regulatory requirements.
+
