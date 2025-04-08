@@ -51,6 +51,7 @@ WORDPRESS_URL = config.get("wordpress_url", "")
 WORDPRESS_API_URL = WORDPRESS_URL + "/wp-json/wp/v2"
 #ALLOWED_ORIGINS = config.get("allowed_origins", ["http://localhost", "https://yourwordpresssite.com"])
 ALLOWED_ORIGINS = config.get("allowed_origins", ["http://localhost"])
+ALLOWED_SURVEYS = config.get("allowed_surveys", [])
 
 # CORS support
 @app.after_request
@@ -147,7 +148,7 @@ def verify_participant():
             'returnFormat': 'json'
         }
         
-        redcap_response = requests.post(REDCAP_API_URL, data=redcap_data)  ## Including arg verify=False for debugging/dev runs if redcap_url having SSL issues
+        redcap_response = requests.post(REDCAP_API_URL, data=redcap_data, verify=True)  ## Including arg verify=False for debugging/dev runs if redcap_url having SSL issues
         
         if redcap_response.status_code != 200:
             logger.error(f"REDCap API error: {redcap_response.text}")
@@ -247,6 +248,7 @@ def wordpress_auth():
                     'username': data['username'],
                     'password': data['password']
                 },
+                verify=True,
                 timeout=10  # Add timeout to prevent hanging
             )
             print(f"AUTH DEBUG: Status code: {auth_response.status_code}", file=sys.stderr)
@@ -390,7 +392,7 @@ def get_patient_data(user_email):
         
         # Replace 'email' with your actual REDCap email field name
         
-        redcap_response = requests.post(REDCAP_API_URL, data=data)  ## If having SSL cert issues with redcap_url, can add arg verify=False to this call for debugging.
+        redcap_response = requests.post(REDCAP_API_URL, data=data, verify=True)  ## If having SSL cert issues with redcap_url, can add arg verify=False to this call for debugging.
         app.logger.info(f"REDCap raw response: {redcap_response.text[:200]}...")  # Log first 200 chars
         
         if redcap_response.status_code != 200:
@@ -422,6 +424,11 @@ def get_patient_data(user_email):
 @token_required
 def get_survey_results(user_email, survey_name):
     """Get specific survey results for the authenticated patient"""
+    
+    # Validate requested survey
+    if survey_name not in ALLOWED_SURVEYS:
+        return jsonify({'message': 'Access to this survey is not permitted or survey does not exist'}), 403
+    
     try:
         # Sanitize survey name to prevent injection
         survey_name = survey_name.strip()
@@ -437,7 +444,7 @@ def get_survey_results(user_email, survey_name):
             'returnFormat': 'json'
         }
         
-        redcap_response = requests.post(REDCAP_API_URL, data=data)
+        redcap_response = requests.post(REDCAP_API_URL, data=data, verify=True)
         
         if redcap_response.status_code != 200:
             app.logger.error(f"REDCap API error: {redcap_response.text}")
@@ -461,6 +468,11 @@ def get_survey_results(user_email, survey_name):
 @token_required
 def get_survey_metadata(user_email, survey_name):
     """Get comprehensive metadata for a specific survey"""
+    
+    # Validate requested survey
+    if survey_name not in ALLOWED_SURVEYS:
+        return jsonify({'message': 'Access to this survey is not permitted or survey does not exist'}), 403
+    
     try:
         # Sanitize survey name
         survey_name = survey_name.strip()
@@ -474,7 +486,7 @@ def get_survey_metadata(user_email, survey_name):
             'returnFormat': 'json'
         }
         
-        metadata_response = requests.post(REDCAP_API_URL, data=metadata_data)
+        metadata_response = requests.post(REDCAP_API_URL, data=metadata_data, verify=True)
         
         if metadata_response.status_code != 200:
             logger.error(f"REDCap API error (metadata): {metadata_response.text}")
@@ -490,7 +502,7 @@ def get_survey_metadata(user_email, survey_name):
             'returnFormat': 'json'
         }
         
-        instrument_response = requests.post(REDCAP_API_URL, data=instrument_data)
+        instrument_response = requests.post(REDCAP_API_URL, data=instrument_data, verify=True)
         
         if instrument_response.status_code != 200:
             logger.error(f"REDCap API error (instrument): {instrument_response.text}")
@@ -508,7 +520,7 @@ def get_survey_metadata(user_email, survey_name):
                 'returnFormat': 'json'
             }
             
-            mapping_response = requests.post(REDCAP_API_URL, data=mapping_data)
+            mapping_response = requests.post(REDCAP_API_URL, data=mapping_data, verify=True)
             
             if mapping_response.status_code == 200:
                 formEventMapping = mapping_response.json()
@@ -533,7 +545,7 @@ def get_survey_metadata(user_email, survey_name):
                     'returnFormat': 'json'
                 }
                 
-                verification_response = requests.post(REDCAP_API_URL, data=verification_data)
+                verification_response = requests.post(REDCAP_API_URL, data=verification_data, verify=True)
                 
                 if verification_response.status_code != 200:
                     return jsonify({'message': 'Error verifying record access'}), 500
@@ -553,7 +565,7 @@ def get_survey_metadata(user_email, survey_name):
                     'returnFormat': 'json'
                 }
                 
-                file_response = requests.post(REDCAP_API_URL, data=file_data)
+                file_response = requests.post(REDCAP_API_URL, data=file_data, verify=True)
                 
                 if file_response.status_code != 200:
                     return jsonify({'message': 'Error retrieving file'}), 500
