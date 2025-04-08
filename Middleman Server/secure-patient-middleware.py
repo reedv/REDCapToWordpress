@@ -375,6 +375,8 @@ def auth_verify():
 @token_required
 def get_patient_data(user_email):
     """Get patient's own data from REDCap, filtered by their email"""
+    # Return error or restricted access message
+    return jsonify({'message': 'Full record access is disabled for security reasons. Please access specific surveys instead.'}), 403
     try:
         # Make a secure REDCap API call with filtering, see https://<your redcap_url>/api/help/?content=exp_records 
         data = {

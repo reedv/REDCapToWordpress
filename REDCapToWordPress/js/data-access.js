@@ -29,6 +29,11 @@ class REDCapPatientData {
           };
         }
       }
+      return {
+        success: false,
+        error: 'Full record access is disabled for security reasons. Please access specific surveys instead.',
+        errorType: 'access_restricted'
+      };
       
       const response = await fetch(this.patientDataEndpoint, {
         method: 'GET',

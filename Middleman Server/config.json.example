@@ -4,5 +4,6 @@
   "jwt_secret": "GENERATE_A_SECURE_RANDOM_STRING",
   "wordpress_url": "https://your-wordpress-site.com",
   "allowed_origins": ["https://your-wordpress-site.com"],
-  "jwt_expiration_minutes": 30
+  "jwt_expiration_minutes": 30,
+  "allowed_surveys": ["survey_name_1", "survey_name_2", "survey_name_3"]
 }
