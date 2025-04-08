@@ -139,6 +139,8 @@ If a survey doesn't display properly:
 
 The portal is designed to gracefully handle missing data, displaying appropriate messages when no survey responses exist for the current user.
 
+**Allowed survey names must also be specified in middleware config file at `/Middleman Server/config.json`**, refer to `/Middleman Server/config.json.example`.
+
 ## Building the Security Middleware
 
 ### Description and Rationale
