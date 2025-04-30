@@ -1,10 +1,7 @@
 # REDCapToWordPress WordPress plugin
 
 ## Description
-This plugin is designed to create a patient portal for medical or other research studies
-that are patient-driven, meaning that the study participant needs to enter data but also needs
-access to the data they input as well as study results that pertain to them. This links REDCap projects 
-to WordPress websites, giving patients access to their personal data that they share with research projects.
+This plugin is designed to create a patient portal for medical or other research studies that are patient-driven, meaning that the study participant needs to enter data but also needs access to the data they input as well as study results that pertain to them. This links REDCap projects to WordPress websites, giving patients access to their personal data that they share with research projects.
 
 ### Pre-requisite plugins:
     
@@ -16,10 +13,7 @@ Download the REDCapToWordPress repository.
 
 In the **config.json** file within the Middleware Server folder, add your REDCap API token and configure the middleware settings. More details on this are below.
  
-Once all the changes are made, add the REDCapToWordPress folder to the plugins
-folder in WordPress. You can either directly upload the folder to your hosting server to 
-/htdocs/wp_content/plugins, or you can zip the folder and upload it through the admin backend
-view of WordPress.
+Once all the changes are made, add the REDCapToWordPress folder to the plugins folder in WordPress. You can either directly upload the folder to your hosting server to  /htdocs/wp_content/plugins, or you can zip the `/REDCapToWordPress` folder and upload it through the admin backend view of WordPress.
 
 ### Creating landing pages
 
