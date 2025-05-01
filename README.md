@@ -3,6 +3,41 @@
 ## Description
 This plugin is designed to create a patient portal for medical or other research studies that are patient-driven, meaning that the study participant needs to enter data but also needs access to the data they input as well as study results that pertain to them. This links REDCap projects to WordPress websites, giving patients access to their personal data that they share with research projects.
 
+## Plugin Structure
+Folder structure of the plugin code basically follows Model-View-Controller (MVC) pattern:
+- Model: `includes/` files handle data processing and storage
+- View: `templates/` files generate the user interface
+- Controller: `RedCap.php` and AJAX handlers that coordinate data flow
+
+`REDCapToWordpress/REDCapToWordPress/Redcap.php` contains the main plugin file WordPress primary entry point. This file:
+- Registers hooks and shortcodes
+- Initializes the plugin
+- Coordinates the interaction between components
+  
+`REDCapToWordpress/REDCapToWordPress/includes` contains files are incorporated into other files via PHP's require or include functions, rather than being loaded directly by WordPress. This directory contains:
+- Business logic classes and functions
+- Data processing utilities
+- Authentication mechanisms
+- API communication functions (like redcap_api_to_flask.php)
+
+These files handle operations that should occur on the server-side of the WP plugin (not the middleware server) for security reasons. The middleware pattern (using `includes/redcap_api_to_flask.php`) ensures the REDCap API token never reaches the browser.
+
+`REDCapToWordpress/REDCapToWordPress/js` contains client-side JavaScript that:
+- Runs in the user's browser
+- Handles user interactions
+- Makes AJAX requests
+- Updates the DOM based on responses
+
+This code is separate from the code in the `/includes` folder as it executes in an entirely different environment (browser vs. server).
+
+`REDCapToWordpress/REDCapToWordPress/templates` contains files that generate HTML output, thus separating presentation from logic. This adheres to the separation of concerns principle because:
+- Visual representation should be isolated from data processing
+- Templates can be modified without altering core functionality
+- The same data can be presented in different ways
+
+`REDCapToWordpress/REDCapToWordPress/css/` just contains styling information separated from structural HTML, following web development best practices.
+
+
 ### Pre-requisite plugins:
     
 This plugin requires the [Native PHP Sessions for WordPress plugin](https://wordpress.org/plugins/wp-native-php-sessions/).
