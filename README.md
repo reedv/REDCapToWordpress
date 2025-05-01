@@ -259,7 +259,7 @@ The security model ensures patients can only access their own data through:
 
 ## Data Mapping
 
-The wp_redcap table maps WordPress user emails to REDCap record IDs:
+Upon activation, the plugin creates a table for the wp site's DB called `wp_redcap` (or using whatever other prefix is specificed in the WP site's wp-config file) that maps WordPress user emails to REDCap record IDs:
 
 ```
 +------------------+-------------+
