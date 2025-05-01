@@ -2,8 +2,7 @@
 /**
  * REDCap Patient Portal Login Form Template
  * 
- * Displays a login form that authenticates through WordPress
- * but securely connects to REDCap data.
+ * Redirects to WordPress login and then back to portal with verification
  */
 
 // Prevent direct access
@@ -13,126 +12,85 @@ if (!defined('WPINC')) {
 
 // Get redirect URL from shortcode attributes
 $redirect_url = !empty($atts['redirect_url']) ? esc_url($atts['redirect_url']) : '';
-?>
+$current_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";  // TODO: Force to https protocol prefix?
 
-<div class="redcap-portal-container">
-    <div id="redcap-login-container">
-        <h2 class="redcap-form-title"><?php echo esc_html__('Access Your Health Data', 'redcap-patient-portal'); ?></h2>
-        
-        <div id="redcap-login-error" class="redcap-error-message" style="display: none;"></div>
-        <div id="redcap-session-expired-alert" class="redcap-warning-message" style="display: none;">
-            <?php echo esc_html__('Your session has expired. Please log in again.', 'redcap-patient-portal'); ?>
+// Check if user is already logged in to WordPress
+if (is_user_logged_in()) {
+    // User is logged in, check for REDCap verification endpoint
+    $verification_nonce = wp_create_nonce('redcap_verify_wp_session');
+    
+    // Redirect to portal if already logged in to WP
+    if (!empty($redirect_url)) {
+        ?>
+        <div class="redcap-portal-container">
+            <div id="redcap-login-container">
+                <div class="redcap-success-message">
+                    <?php echo esc_html__('You are already logged in. Verifying your REDCap access...', 'redcap-patient-portal'); ?>
+                </div>
+            </div>
         </div>
         
-        <form id="redcap-login-form" class="redcap-form">
-            <div class="redcap-form-group">
-                <label for="redcap-username"><?php echo esc_html__('Username', 'redcap-patient-portal'); ?></label>
-                <input type="text" id="redcap-username" name="username" required>
-            </div>
+        <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            // Verify this WordPress session has REDCap access
+            $.ajax({
+                url: redcapPortal.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'redcap_verify_wp_session',
+                    nonce: '<?php echo $verification_nonce; ?>'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Initialize auth object with the token
+                        const redcapAuth = new REDCapAuth(redcapPortal.middlewareUrl);
+                        redcapAuth.saveSession(response.data.token, response.data.expiresIn);
+                        window.location.href = '<?php echo $redirect_url; ?>';
+                    } else {
+                        $('#redcap-login-container').html(
+                            '<div class="redcap-error-message">' + 
+                            (response.data.message || '<?php echo esc_js(__('Unable to verify REDCap access', 'redcap-patient-portal')); ?>') +
+                            '</div>'
+                        );
+                    }
+                },
+                error: function() {
+                    $('#redcap-login-container').html(
+                        '<div class="redcap-error-message">' + 
+                        '<?php echo esc_js(__('Error verifying REDCap access', 'redcap-patient-portal')); ?>' +
+                        '</div>'
+                    );
+                }
+            });
+        });
+        </script>
+        <?php
+    }
+} else {
+    // User is not logged in, redirect to WordPress login
+    $login_url = wp_login_url($current_url);
+    ?>
+    <div class="redcap-portal-container">
+        <div id="redcap-login-container">
+            <h2 class="redcap-form-title"><?php echo esc_html__('Access Your Health Data', 'redcap-patient-portal'); ?></h2>
             
-            <div class="redcap-form-group">
-                <label for="redcap-password"><?php echo esc_html__('Password', 'redcap-patient-portal'); ?></label>
-                <input type="password" id="redcap-password" name="password" required>
+            <div class="redcap-login-instructions">
+                <p><?php echo esc_html__('You need to log in to access your secure health data portal.', 'redcap-patient-portal'); ?></p>
             </div>
             
             <div class="redcap-form-actions">
-                <button type="submit" class="redcap-button redcap-primary-button">
-                    <?php echo esc_html__('Log In', 'redcap-patient-portal'); ?>
-                </button>
+                <a href="<?php echo esc_url($login_url); ?>" class="redcap-button redcap-primary-button">
+                    <?php echo esc_html__('Log In with WordPress', 'redcap-patient-portal'); ?>
+                </a>
                 
                 <?php if (get_option('users_can_register')): ?>
                 <a href="<?php echo esc_url(wp_registration_url()); ?>" class="redcap-register-link">
                     <?php echo esc_html__('Register', 'redcap-patient-portal'); ?>
                 </a>
                 <?php endif; ?>
-                
-                <a href="<?php echo esc_url(wp_lostpassword_url()); ?>" class="redcap-forgot-password-link">
-                    <?php echo esc_html__('Forgot Password?', 'redcap-patient-portal'); ?>
-                </a>
             </div>
-            
-            <?php if (!empty($redirect_url)): ?>
-            <input type="hidden" name="redirect_url" value="<?php echo esc_attr($redirect_url); ?>">
-            <?php endif; ?>
-            
-            <?php wp_nonce_field('redcap_portal_login_nonce', 'redcap_login_nonce'); ?>
-        </form>
-        
-        <div class="redcap-login-loading" style="display: none;">
-            <div class="redcap-spinner"></div>
-            <p><?php echo esc_html__('Logging in...', 'redcap-patient-portal'); ?></p>
         </div>
     </div>
-</div>
-
-<script type="text/javascript">
-jQuery(document).ready(function($) {
-    // Check if already authenticated
-    const redcapAuth = new REDCapAuth(redcapPortal.middlewareUrl);
-    
-    if (redcapAuth.isAuthenticated()) {
-        // If already logged in and there's a redirect URL, go there
-        const redirectUrl = $('input[name="redirect_url"]').val();
-        if (redirectUrl) {
-            window.location.href = redirectUrl;
-        } else {
-            // Otherwise show a logged-in message
-            $('#redcap-login-container').html(
-                '<div class="redcap-success-message">' + 
-                '<?php echo esc_js(__('You are already logged in.', 'redcap-patient-portal')); ?>' +
-                '</div>'
-            );
-        }
-    }
-    
-    // Login form submission
-    $('#redcap-login-form').on('submit', async function(e) {
-        e.preventDefault();
-        
-        // Show loading state
-        $('.redcap-login-loading').show();
-        $('#redcap-login-form').hide();
-        $('#redcap-login-error').hide();
-        
-        const username = $('#redcap-username').val();
-        const password = $('#redcap-password').val();
-        
-        try {
-            const result = await redcapAuth.login(username, password);
-            
-            if (result.success) {
-                // Successful login
-                const redirectUrl = $('input[name="redirect_url"]').val();
-                if (redirectUrl) {
-                    window.location.href = redirectUrl;
-                } else {
-                    // Show success message if no redirect
-                    $('#redcap-login-container').html(
-                        '<div class="redcap-success-message">' +
-                        '<?php echo esc_js(__('Login successful! You can now access your data.', 'redcap-patient-portal')); ?>' +
-                        '</div>'
-                    );
-                }
-            } else {
-                // Failed login with specific error handling
-                $('.redcap-login-loading').hide();
-                $('#redcap-login-form').show();
-                
-                let errorMessage = result.error || '<?php echo esc_js(__('Login failed. Please check your credentials.', 'redcap-patient-portal')); ?>';
-                
-                // Custom error messages for specific error types
-                if (result.errorType === 'network') {
-                    errorMessage = '<?php echo esc_js(__('Connection error. Please check your internet connection and try again.', 'redcap-patient-portal')); ?>';
-                }
-                
-                $('#redcap-login-error').show().text(errorMessage);
-            }
-        } catch (error) {
-            // Error during login
-            $('.redcap-login-loading').hide();
-            $('#redcap-login-form').show();
-            $('#redcap-login-error').show().text(error.message || '<?php echo esc_js(__('An error occurred during login. Please try again.', 'redcap-patient-portal')); ?>');
-        }
-    });
-});
-</script>
+    <?php
+}
+?>

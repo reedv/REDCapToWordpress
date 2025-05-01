@@ -42,17 +42,22 @@ class REDCap_Patient_Portal {
         // Enqueue scripts and styles
         add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
         
-        // Add AJAX handlers
-        add_action('wp_ajax_redcap_verify_token', array($this, 'ajax_verify_token'));
-        add_action('wp_ajax_nopriv_redcap_verify_token', array($this, 'ajax_verify_token'));
-        
         // Add settings page
         add_action('admin_menu', array($this, 'add_admin_menu'));
         add_action('admin_init', array($this, 'register_settings'));
 
-        // Add the AJAX handler for self-registration
+        // Add AJAX handlers for verifying middleware access token
+        add_action('wp_ajax_redcap_verify_token', array($this, 'ajax_verify_token'));
+        add_action('wp_ajax_nopriv_redcap_verify_token', array($this, 'ajax_verify_token'));
+
+        // Add the AJAX handler for user self-registration
         add_action('wp_ajax_nopriv_redcap_verify_and_register', array($this, 'ajax_verify_and_register'));
         add_action('wp_ajax_redcap_verify_and_register', array($this, 'ajax_verify_and_register'));
+
+        // Add AJAX handler for WordPress session verification
+        add_action('wp_ajax_redcap_verify_wp_session', array($this, 'ajax_verify_wp_session'));
+        add_action('wp_ajax_nopriv_redcap_verify_wp_session', array($this, 'ajax_verify_wp_session'));
+
     }
     
     /**
@@ -252,6 +257,73 @@ class REDCap_Patient_Portal {
             'message' => __('Registration successful! Please check your email for instructions to set your password.', 'redcap-patient-portal'),
             'redirect' => $redirect_url
         ));
+    }
+
+    /**
+     * AJAX handler to verify WordPress session and generate middleware token
+     */
+    public function ajax_verify_wp_session() {
+        check_ajax_referer('redcap_verify_wp_session', 'nonce');
+        
+        // Check if user is logged in
+        if (!is_user_logged_in()) {
+            wp_send_json_error(array('message' => 'Not logged in'));
+            return;
+        }
+        
+        // Get current user
+        $current_user = wp_get_current_user();
+        $user_email = $current_user->user_email;
+        
+        if (empty($user_email)) {
+            wp_send_json_error(array('message' => 'User has no email'));
+            return;
+        }
+        
+        // Verify REDCap record exists
+        global $wpdb;
+        $table_name = $wpdb->prefix . "redcap";
+        
+        $record = $wpdb->get_row($wpdb->prepare(
+            "SELECT record_id FROM $table_name WHERE email = %s",
+            $user_email
+        ));
+        
+        if (!$record) {
+            wp_send_json_error(array('message' => 'No associated REDCap record found'));
+            return;
+        }
+        
+        // Generate token via middleware
+        $response = wp_remote_post($this->middleware_url . '/auth/generate_token', array(
+            'body' => json_encode(array('email' => $user_email)),
+            'headers' => array('Content-Type' => 'application/json'),
+            'timeout' => 15
+        ));
+        
+        if (is_wp_error($response)) {
+            wp_send_json_error(array(
+                'message' => 'Error contacting middleware server',
+                'error' => 'server_connection'
+            ));
+            return;
+        }
+        
+        $status_code = wp_remote_retrieve_response_code($response);
+        $body = wp_remote_retrieve_body($response);
+        $data = json_decode($body, true);
+        
+        if ($status_code === 200 && isset($data['token'])) {
+            wp_send_json_success(array(
+                'token' => $data['token'],
+                'expiresIn' => $data['expiresIn'] ?? 1800 // 30 minutes default
+            ));
+        } else {
+            wp_send_json_error(array(
+                'message' => isset($data['message']) ? $data['message'] : 'Error generating token',
+                'error' => isset($data['error']) ? $data['error'] : 'unknown'
+            ));
+        }
     }
     
     /**

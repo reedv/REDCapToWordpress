@@ -322,6 +322,58 @@ def wordpress_auth():
             'message': 'Internal authentication error',
             'error_type': 'unexpected_error'
         }), 500
+    
+@app.route('/auth/generate_token', methods=['POST'])
+def generate_token_endpoint():
+    """Generate a token for an already authenticated WordPress user"""
+    # This function differs from the wordpress_auth function in that the latter expects username/password credentials, validates them against WordPress, and then generates a token. 
+    # This new endpoint assumes the user is already validated by WordPress and just needs a token. (per issue #18 for WP site-level 2FA/MFA compatability)
+
+    try:
+        # Extract request data
+        data = request.get_json()
+        if not data:
+            logger.warning("No JSON data received in token generation request")
+            return jsonify({
+                'message': 'No data provided',
+                'error_type': 'invalid_request'
+            }), 400
+
+        # Log sanitized data
+        logger.info(f"Token generation for email: {data.get('email', 'N/A')}")
+
+        # Validate required fields
+        if 'email' not in data or not data['email']:
+            logger.warning("Missing email in token generation request")
+            return jsonify({
+                'message': 'Missing email',
+                'error_type': 'incomplete_data'
+            }), 400
+
+        user_email = data['email']
+        
+        # Generate the token
+        token = generate_token(user_email)
+        
+        # Log token generation (without revealing the token)
+        logger.info(f"JWT token generated for user: {user_email}")
+
+        return jsonify({
+            'token': token,
+            'expiresIn': JWT_EXPIRATION * 60,
+            'user': {
+                'email': user_email
+            }
+        }), 200
+
+    except Exception as e:
+        # Catch-all for any unexpected errors
+        logger.error(f"Unexpected error during token generation: {str(e)}")
+        logger.error(traceback.format_exc())
+        return jsonify({
+            'message': 'Internal token generation error',
+            'error_type': 'unexpected_error'
+        }), 500
 
 @app.route('/auth/verify', methods=['POST', 'OPTIONS'])
 def auth_verify():

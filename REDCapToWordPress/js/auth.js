@@ -49,6 +49,11 @@ class REDCapAuth {
   
   /**
    * Log in with WordPress credentials via middleware
+   * This is maintained for backward compatibility but no longer the primary auth method (per issue #18 for 2FA/MFA WP site-level plugin compatibility, login-form.php uses REDCapAuth.saveSession method to login users based on WP standard login system, rather than plugin custom login)
+   * Keeping this function as...
+   * 1. We're still using the same token format and storage
+   * 2. The portal page relies on this class for token validation
+   * 3. Existing code expects this interface
    */
   async login(username, password) {
     try {

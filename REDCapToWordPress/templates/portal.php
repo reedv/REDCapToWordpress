@@ -11,6 +11,13 @@ if (!defined('WPINC')) {
     die;
 }
 
+// Check WordPress login status first
+if (!is_user_logged_in()) {
+    // Redirect to login page
+    wp_redirect(site_url('/login'));
+    exit;
+}
+
 // Get attributes from shortcode
 $survey = !empty($atts['survey']) ? sanitize_text_field($atts['survey']) : '';
 $show_profile = !empty($atts['show_profile']) && $atts['show_profile'] === 'yes';
