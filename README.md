@@ -236,7 +236,7 @@ python secure-patient-middleware.py
 gunicorn --bind 0.0.0.0:5000 secure-patient-middleware:app
 ```
 
-For local testing (eg. before building, tagging, and pushing image to run container on AWS ECS or GCP Artifact Registry for running as a Cloud Run service), you can run...
+For local testing (eg. before building, tagging, and pushing image to run container on [AWS ECS](https://docs.aws.amazon.com/AmazonECR/latest/userguide/docker-push-ecr-image.html) or [GCP Artifact Registry](https://cloud.google.com/build/docs/build-push-docker-image) for running as a Cloud Run service), you can run...
 ```bash
 cd ./Middleman\ Server
 docker build -t wp2redcap_middleware
