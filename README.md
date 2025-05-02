@@ -244,7 +244,7 @@ docker run -p 8080:8080 wp2redcap_middleware
 ```
 ... then some sanity testing to request and recieve something like...
 ```bash
-$ curl http://localhost:8080/auth/wordpress -X POST -H "Content-Type: application/json" -d '{"username":"test","password":"test"}'
+$ curl http://localhost:8080/auth/generate_token -X POST -H "Content-Type: application/json" -d '{"email":"test"}'
 {"message": "Invalid credentials"}
 ```
 
