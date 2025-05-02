@@ -4,7 +4,6 @@
 class REDCapAuth {
   constructor(middlewareUrl) {
     this.middlewareUrl = middlewareUrl;
-    this.authEndpoint = `${middlewareUrl}/auth/wordpress`;
     this.token = null;
     this.tokenExpiry = null;
     
@@ -45,51 +44,6 @@ class REDCapAuth {
     
     sessionStorage.setItem('redcap_token', token);
     sessionStorage.setItem('redcap_token_expiry', expiryTime.toString());
-  }
-  
-  /**
-   * Log in with WordPress credentials via middleware
-   * This is maintained for backward compatibility but no longer the primary auth method (per issue #18 for 2FA/MFA WP site-level plugin compatibility, login-form.php uses REDCapAuth.saveSession method to login users based on WP standard login system, rather than plugin custom login)
-   * Keeping this function as...
-   * 1. We're still using the same token format and storage
-   * 2. The portal page relies on this class for token validation
-   * 3. Existing code expects this interface
-   */
-  async login(username, password) {
-    try {
-      const response = await fetch(this.authEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ username, password }),
-        credentials: 'include'
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        return {
-          success: false,
-          error: data.message || 'Authentication failed',
-          errorType: data.error || 'unknown'
-        };
-      }
-      
-      this.saveSession(data.token, data.expiresIn);
-      
-      return {
-        success: true,
-        user: data.user
-      };
-    } catch (error) {
-      console.error('Login error:', error);
-      return {
-        success: false,
-        error: error.message || 'Authentication failed',
-        errorType: 'network'
-      };
-    }
   }
   
   /**
