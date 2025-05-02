@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 import logging
 import traceback
 import requests
-from flask import request, jsonify
+import re
 import json
 import sys
 
@@ -52,6 +52,22 @@ WORDPRESS_API_URL = WORDPRESS_URL + "/wp-json/wp/v2"
 #ALLOWED_ORIGINS = config.get("allowed_origins", ["http://localhost", "https://yourwordpresssite.com"])
 ALLOWED_ORIGINS = config.get("allowed_origins", ["http://localhost"])
 ALLOWED_SURVEYS = config.get("allowed_surveys", [])
+
+def sanitize_for_redcap(value):
+    """Escape special characters for REDCap filterLogic"""
+    if value is None:
+        return ""
+    # Replace single quotes with double quotes to prevent SQL injection
+    # and escape other special characters
+        
+    # Convert to string and trim whitespace
+    value = str(value).strip()
+    # Escape single quotes (SQL-style escaping)
+    value = value.replace("'", "''")
+    # Remove or escape other potentially problematic characters
+    value = re.sub(r'[\\";=<>()]', '', value)
+    
+    return value
 
 # CORS support
 @app.after_request
@@ -125,6 +141,23 @@ def verify_participant():
                 'verified': False
             }), 400
 
+        # Validate email format
+        email = data.get('email', '')
+        if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+            return jsonify({
+                'message': 'Invalid email format',
+                'verified': False
+            }), 400
+
+        # Validate name format (allow letters, spaces, hyphens)
+        first_name = data.get('first_name', '')
+        last_name = data.get('last_name', '')
+        if not re.match(r'^[a-zA-Z\s\-]+$', first_name) or not re.match(r'^[a-zA-Z\s\-]+$', last_name):
+            return jsonify({
+                'message': 'Invalid name format. For security purposes, only letters, spaces, and hyphens are allowed.',
+                'verified': False
+            }), 400
+
         # Log sanitized data
         logger.info(f"Verification attempt for email: {data.get('email', 'N/A')}")
 
@@ -144,7 +177,7 @@ def verify_participant():
             'content': 'record',
             'format': 'json',
             'type': 'flat',
-            'filterLogic': f"[email] = '{data['email']}' AND [self_consent_first_name] = '{data['first_name']}' AND [self_consent_last_name] = '{data['last_name']}'",
+            'filterLogic': f"[email] = '{sanitize_for_redcap(data['email'])}' AND [self_consent_first_name] = '{sanitize_for_redcap(data['first_name'])}' AND [self_consent_last_name] = '{sanitize_for_redcap(data['last_name'])}'",
             'returnFormat': 'json'
         }
         
@@ -307,7 +340,7 @@ def get_patient_data(user_email):
             'content': 'record',
             'format': 'json',
             'type': 'flat',
-            'filterLogic': f"[email] = '{user_email}'",  # Only return this patient's records
+            'filterLogic': f"[email] = '{sanitize_for_redcap(user_email)}'",  # Only return this patient's records
             'returnFormat': 'json'
         }
         
@@ -353,6 +386,9 @@ def get_survey_results(user_email, survey_name):
     try:
         # Sanitize survey name to prevent injection
         survey_name = survey_name.strip()
+        # Validate against allowed surveys
+        if survey_name not in ALLOWED_SURVEYS:
+            return jsonify({'message': 'Access to this survey is not permitted or survey does not exist'}), 403
         
         # Make a secure REDCap API call with filtering
         data = {
@@ -361,7 +397,7 @@ def get_survey_results(user_email, survey_name):
             'format': 'json',
             'type': 'flat',
             'forms': survey_name,  # Only return data from this survey/form
-            'filterLogic': f"[email] = '{user_email}'",  # Only return this patient's records
+            'filterLogic': f"[email] = '{sanitize_for_redcap(user_email)}'",  # Only return this patient's records
             'returnFormat': 'json'
         }
         
@@ -455,6 +491,15 @@ def get_survey_metadata(user_email, survey_name):
             @app.route('/patient/file/<record_id>/<field_name>', methods=['GET'])
             @token_required
             def get_file(user_email, record_id, field_name):
+
+                # Validate record_id format (assuming it's numeric)
+                if not record_id.isdigit():
+                    return jsonify({'message': 'Invalid record ID format'}), 400
+                
+                # Validate field_name format (only allow alphanumeric and underscores)
+                if not re.match(r'^[a-zA-Z0-9_]+$', field_name):
+                    return jsonify({'message': 'Invalid field name format'}), 400
+                
                 # Verify this user has access to this record
                 verification_data = {
                     'token': REDCAP_API_TOKEN,
@@ -465,9 +510,7 @@ def get_survey_metadata(user_email, survey_name):
                     'fields[0]': 'email',
                     'returnFormat': 'json'
                 }
-                
                 verification_response = requests.post(REDCAP_API_URL, data=verification_data, verify=True)
-                
                 if verification_response.status_code != 200:
                     return jsonify({'message': 'Error verifying record access'}), 500
                     

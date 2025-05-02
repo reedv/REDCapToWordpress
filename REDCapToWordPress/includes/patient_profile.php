@@ -9,7 +9,7 @@ function proband_link(){
 		global $wpdb;
 
 		$email = $_SESSION["email"];
-		$row = $wpdb->get_row( 'SELECT record_id FROM wp_redcap WHERE email="'. $email . '";', ARRAY_N );
+        $row = $wpdb->get_row($wpdb->prepare("SELECT record_id FROM wp_redcap WHERE email = %s", $email), ARRAY_N);
 		$record_id = ($row[0]);
 
 		if ($record_id=="") {
