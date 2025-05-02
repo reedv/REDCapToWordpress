@@ -532,56 +532,5 @@ class REDCap_Patient_Portal {
     }
 }
 
-
-add_action('rest_api_init', function () {
-    register_rest_route('redcap-portal/v1', '/authenticate', array(
-        'methods' => 'POST',
-        'callback' => 'redcap_custom_authentication',
-        'permission_callback' => '__return_true'
-    ));
-});
-
-function redcap_custom_authentication(WP_REST_Request $request) {
-    $username = $request->get_param('username');
-    $password = $request->get_param('password');
-
-    $user = wp_signon(array(
-        'user_login' => $username,
-        'user_password' => $password,
-        'remember' => false
-    ), false);
-
-    if (is_wp_error($user)) {
-        return new WP_REST_Response(array(
-            'authenticated' => false,
-            'error' => $user->get_error_message()
-        ), 401);
-    }
-
-    // TODO: remove this as I think it causes a circular reference lock when middleware uses redcap_custom_authentication to auth into pat portal page; not sure???
-    // Optional: Additional verification against REDCap record
-    // global $wpdb;
-    // $table_name = $wpdb->prefix . "redcap";
-    // $record = $wpdb->get_row($wpdb->prepare(
-    //     "SELECT record_id FROM $table_name WHERE email = %s",
-    //     $user->user_email
-    // ));
-    // if (!$record) {
-    //     return new WP_REST_Response(array(
-    //         'authenticated' => false,
-    //         'error' => 'No associated REDCap record found'
-    //     ), 401);
-    // }
-
-    return new WP_REST_Response(array(
-        'authenticated' => true,
-        'user' => array(
-            'id' => $user->ID,
-            'email' => $user->user_email,
-            'display_name' => $user->display_name
-        )
-    ), 200);
-}
-
 // Initialize the plugin
 $redcap_patient_portal = new REDCap_Patient_Portal();
