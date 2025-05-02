@@ -378,11 +378,6 @@ def get_patient_data(user_email):
 @token_required
 def get_survey_results(user_email, survey_name):
     """Get specific survey results for the authenticated patient"""
-    
-    # Validate requested survey
-    if survey_name not in ALLOWED_SURVEYS:
-        return jsonify({'message': 'Access to this survey is not permitted or survey does not exist'}), 403
-    
     try:
         # Sanitize survey name to prevent injection
         survey_name = survey_name.strip()
