@@ -159,6 +159,8 @@ Each survey's display can be customized by:
 
 ### Troubleshooting Survey Display
 
+If new portal user registration is not sending wordpress account registration emails as expected, make sure that SMTP and any required SMTP wordpress plugins are properly configured for your site.
+
 If a survey doesn't display properly:
 
 1. Check your browser's developer console for JavaScript errors
