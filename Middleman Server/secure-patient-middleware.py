@@ -13,7 +13,6 @@ Deploy this as a separate service alongside your WordPress installation.
 from flask import Flask, request, jsonify, abort, make_response
 import jwt
 import json
-import os
 from functools import wraps
 from datetime import datetime, timedelta
 import logging
@@ -22,6 +21,7 @@ import requests
 import re
 import json
 import sys
+import os
 
 # Configure logging to output to stdout/stderr for Cloud Run logging
 logging.basicConfig(
@@ -42,8 +42,9 @@ with open("config.json", "r") as f:
     config = json.load(f)
 
 REDCAP_API_URL = config.get("redcap_url", "")
-REDCAP_API_TOKEN = config.get("redcap_api_token", "")
-JWT_SECRET = config.get("jwt_secret", "change-this-to-a-secure-random-string")
+# get REDCAP API token and JWT_SECRET from env variable rather than config file for better security
+REDCAP_API_TOKEN = os.environ.get("REDCAP_API_TOKEN", "")
+JWT_SECRET = os.environ.get("JWT_SECRET", "default-only-for-development")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION = 30  # Minutes
 WORDPRESS_URL = config.get("wordpress_url", "")
@@ -51,6 +52,15 @@ WORDPRESS_API_URL = WORDPRESS_URL + "/wp-json/wp/v2"
 #ALLOWED_ORIGINS = config.get("allowed_origins", ["http://localhost", "https://yourwordpresssite.com"])
 ALLOWED_ORIGINS = config.get("allowed_origins", ["http://localhost"])
 ALLOWED_SURVEYS = config.get("allowed_surveys", [])
+
+# Verify secret is properly set
+# TODO: Will need to update readme to note these changes where 1) we no longer use the config.json JWT secret value and 2) we rely on reading this special env variable to determine if in prod/dev mode
+if REDCAP_API_TOKEN == "" and os.environ.get('WP2REDCAP_ENVIRONMENT') != 'development':
+    logger.error("Production environment detected but REDCAP_API_TOKEN not configured properly!")
+    sys.exit(1)  # Fail to start if not properly configured
+if JWT_SECRET == 'default-only-for-development' and os.environ.get('WP2REDCAP_ENVIRONMENT') != 'development':
+    logger.error("Production environment detected but JWT_SECRET not configured properly!")
+    sys.exit(1)  # Fail to start if not properly configured
 
 def sanitize_for_redcap(value):
     """Escape special characters for REDCap filterLogic"""

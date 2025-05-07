@@ -204,12 +204,16 @@ add your study project's API token, along with other required settings:
 ```json
 {
   "redcap_url": "https://your-redcap-instance.org/api/",
-  "redcap_api_token": "YOUR_REDCAP_API_TOKEN",
-  "jwt_secret": "GENERATE_A_SECURE_RANDOM_STRING",
   "wordpress_url": "https://your-wordpress-site.com",
   "allowed_origins": ["https://your-wordpress-site.com"]
 }
 ```
+
+The middleware server also expects to be able to access certain defined environment variables
+- `REDCAP_API_TOKEN` (your redcap api token)
+- `JWT_SECRET` (a secure random strong that will be used to generate the JWT tokens)
+
+For development purposes you can temporarily set these in the dockerfile, but in production it should probably be set in the environment that will deploy your docker image container (eg. AWS ECS or GCP Cloud Run deployment configurations).
 
 The middleware is designed to filter data by email address. Make sure your REDCap project has an email field that can be used to identify patients.
 
