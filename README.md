@@ -272,6 +272,8 @@ Upon activation, the plugin creates a table for the wp site's DB called `wp_redc
 
 ## Troubleshooting
 
+If new portal user registration is not sending wordpress account registration emails as expected, make sure that SMTP and any required SMTP wordpress plugins are properly configured for your site.
+
 If patients cannot access their data:
 1. Verify their WordPress email matches their REDCap email
 2. Check the wp_redcap table mapping
