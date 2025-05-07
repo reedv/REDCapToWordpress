@@ -68,6 +68,9 @@ class REDCap_Patient_Portal {
         $this->middleware_url = isset($options['middleware_url']) ? 
                                  esc_url_raw($options['middleware_url']) : 
                                  'http://localhost:5000';
+        $this->middleware_api_key = isset($options['middleware_api_key']) ?
+                                $options['middleware_api_key'] :
+                                '';
     }
     
     /**
@@ -95,6 +98,7 @@ class REDCap_Patient_Portal {
         // Create default settings
         $default_settings = array(
             'middleware_url' => 'http://localhost:5000',
+            'middleware_api_key' => '',  // Add default for API key
             'show_debug_info' => 'no'
         );
         
@@ -294,10 +298,20 @@ class REDCap_Patient_Portal {
             return;
         }
 
-        // Load API key from config
-        $config_path = REDCAP_PORTAL_PATH . 'config.ini';
-        $configs = parse_ini_file($config_path);
-        $api_key = isset($configs['middleman_api_key']) ? $configs['middleman_api_key'] : '';
+        // Get API key from WordPress options
+        $options = get_option('redcap_portal_settings');
+        $api_key = isset($options['middleware_api_key']) && !empty($options['middleware_api_key']) 
+            ? $options['middleware_api_key'] 
+            : '';
+        
+        // If API key is not in WordPress options, fall back to config.ini
+        if (empty($api_key)) {
+            $config_path = REDCAP_PORTAL_PATH . 'config.ini';
+            if (file_exists($config_path)) {
+                $configs = parse_ini_file($config_path);
+                $api_key = isset($configs['middleman_api_key']) ? $configs['middleman_api_key'] : '';
+            }
+        }
         
         // Generate token via middleware
         $response = wp_remote_post($this->middleware_url . '/auth/generate_token', array(
@@ -461,6 +475,14 @@ class REDCap_Patient_Portal {
             'redcap-patient-portal',
             'redcap_portal_main_section'
         );
+
+        add_settings_field(
+            'middleman_api_key',
+            'Middleware API key',
+            array($this, 'middleware_api_key_render'),
+            'redcap-patient-portal',
+            'redcap_portal_main_section'
+        );
         
         add_settings_field(
             'show_debug_info',
@@ -489,6 +511,19 @@ class REDCap_Patient_Portal {
                value='<?php echo esc_url($url); ?>' class="regular-text" 
                placeholder="http://localhost:5000">
         <p class="description">Enter the URL of your REDCap security middleware server</p>
+        <?php
+    }
+
+    /**
+     * Middleware API key setting field
+     */
+    public function middleware_api_key_render() {
+        $options = get_option('redcap_portal_settings');
+        $api_key = isset($options['middleware_api_key']) ? $options['middleware_api_key'] : '';
+        ?>
+        <input type='text' name='redcap_portal_settings[middleware_api_key]' 
+               value='<?php echo esc_attr($api_key); ?>' class="regular-text">
+        <p class="description">Enter the API key for your REDCap security middleware server (matches middleware WORDPRESS_API_KEY environment variable)</p>
         <?php
     }
     
