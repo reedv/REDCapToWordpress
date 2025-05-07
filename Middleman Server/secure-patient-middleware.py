@@ -11,7 +11,6 @@ Deploy this as a separate service alongside your WordPress installation.
 """
 
 from flask import Flask, request, jsonify, abort, make_response
-import requests
 import jwt
 import json
 import os
