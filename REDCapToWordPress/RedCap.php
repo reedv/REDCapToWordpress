@@ -293,11 +293,19 @@ class REDCap_Patient_Portal {
             wp_send_json_error(array('message' => 'No associated REDCap record found'));
             return;
         }
+
+        // Load API key from config
+        $config_path = REDCAP_PORTAL_PATH . 'config.ini';
+        $configs = parse_ini_file($config_path);
+        $api_key = isset($configs['middleman_api_key']) ? $configs['middleman_api_key'] : '';
         
         // Generate token via middleware
         $response = wp_remote_post($this->middleware_url . '/auth/generate_token', array(
             'body' => json_encode(array('email' => $user_email)),
-            'headers' => array('Content-Type' => 'application/json'),
+            'headers' => array(
+                'Content-Type' => 'application/json',
+                'X-API-KEY' => $api_key
+            ),
             'timeout' => 15
         ));
         

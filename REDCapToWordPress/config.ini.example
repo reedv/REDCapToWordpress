@@ -11,3 +11,4 @@
 ; add your middleman IP:port or domain to which the website can send RESTful requests.
 ; middleman_url = "http://172.28.119.143:5000"
 middleman_url = "http://127.0.0.1:5000"
+middleman_api_key = "your-secure-random-key-that-matches-middleman-server-WORDPRESS_API_KEY-env-variable-here"

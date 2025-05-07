@@ -34,6 +34,10 @@ function verify_participant($email, $first_name, $last_name) {
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
     curl_setopt($ch, CURLOPT_FRESH_CONNECT, 1);
     curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+        'Content-Type: application/json',
+        'X-API-KEY: ' . $configs['middleman_api_key']
+    ));
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
     
     $output = curl_exec($ch);

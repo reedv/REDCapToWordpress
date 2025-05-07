@@ -41,6 +41,8 @@ app = Flask(__name__)
 with open("config.json", "r") as f:
     config = json.load(f)
 
+
+WORDPRESS_API_KEY = os.environ.get("WORDPRESS_API_KEY")  # this will mostly be used to determine if a request (w/ included X-API-KEY header) to middleware url is allowed to ask for/generate jwt tokens
 REDCAP_API_URL = config.get("redcap_url", "")
 # get REDCAP API token and JWT_SECRET from env variable rather than config file for better security
 REDCAP_API_TOKEN = os.environ.get("REDCAP_API_TOKEN", "")
@@ -53,8 +55,10 @@ WORDPRESS_API_URL = WORDPRESS_URL + "/wp-json/wp/v2"
 ALLOWED_ORIGINS = config.get("allowed_origins", ["http://localhost"])
 ALLOWED_SURVEYS = config.get("allowed_surveys", [])
 
-# Verify secret is properly set
-# TODO: Will need to update readme to note these changes where 1) we no longer use the config.json JWT secret value and 2) we rely on reading this special env variable to determine if in prod/dev mode
+# Verify secrets are properly set
+if WORDPRESS_API_KEY is None and os.environ.get('WP2REDCAP_ENVIRONMENT') != 'development':
+    logger.error("Production environment detected but WORDPRESS_API_KEY not configured properly!")
+    sys.exit(1)
 if REDCAP_API_TOKEN == "" and os.environ.get('WP2REDCAP_ENVIRONMENT') != 'development':
     logger.error("Production environment detected but REDCAP_API_TOKEN not configured properly!")
     sys.exit(1)  # Fail to start if not properly configured
@@ -249,6 +253,15 @@ def generate_token_endpoint():
                 'message': 'No data provided',
                 'error_type': 'invalid_request'
             }), 400
+            
+        # Verify API key (in HTTP header)
+        api_key = request.headers.get('X-API-KEY')
+        if api_key != WORDPRESS_API_KEY and os.environ.get('WP2REDCAP_ENVIRONMENT') != 'development':
+            logger.warning("Invalid API key used in token generation request")
+            return jsonify({
+                'message': 'Unauthorized',
+                'error_type': 'unauthorized'
+            }), 401
 
         # Log sanitized data
         logger.info(f"Token generation for email: {data.get('email', 'N/A')}")
