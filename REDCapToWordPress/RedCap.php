@@ -313,12 +313,18 @@ class REDCap_Patient_Portal {
             }
         }
         
+        // Capture client details for fingerprinting
+        $client_ip = $_SERVER['REMOTE_ADDR'];
+        $client_ua = $_SERVER['HTTP_USER_AGENT'];
+        
         // Generate token via middleware
         $response = wp_remote_post($this->middleware_url . '/auth/generate_token', array(
             'body' => json_encode(array('email' => $user_email)),
             'headers' => array(
                 'Content-Type' => 'application/json',
-                'X-API-KEY' => $api_key
+                'X-API-KEY' => $api_key,
+                'X-Original-Client-IP' => $client_ip,
+                'X-Original-User-Agent' => $client_ua
             ),
             'timeout' => 15
         ));

@@ -14,7 +14,7 @@ from flask import Flask, request, jsonify, abort, make_response
 import jwt
 import json
 from functools import wraps
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 import traceback
 import requests
@@ -22,6 +22,8 @@ import re
 import json
 import sys
 import os
+import hashlib
+import uuid
 
 # Configure logging to output to stdout/stderr for Cloud Run logging
 logging.basicConfig(
@@ -98,23 +100,97 @@ def options():
     return jsonify({'status': 'ok'}), 200
 
 # Security utilities
+def get_client_fingerprint(override_ip=None, override_user_agent=None):
+    """Generate a fingerprint from client details, allowing override values from WordPress"""
+    # Using this to create a fingerprint claim in the token, 
+    # then even if an attacker somehow obtains one's token (through XSS attacks, browser storage access, network sniffing, etc.), 
+    # they still can't use it because:
+    # They would need to precisely mimic your User-Agent string
+    # They would need to access the API from your exact IP address
+    # Both conditions must be met simultaneously
+
+    # Use overrides if provided, otherwise use direct request headers
+    user_agent = override_user_agent or request.headers.get('User-Agent', '')
+    
+    # Get client IP, considering potential proxies
+    if override_ip:
+        ip = override_ip
+    else:
+        ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+        if ip and ',' in ip:
+            # Get the leftmost IP in case of multiple proxies
+            ip = ip.split(',')[0].strip()
+    
+    # Create a fingerprint hash
+    fingerprint = hashlib.sha256(f"{user_agent}|{ip}".encode()).hexdigest()
+    logger.debug(f"Creating fingerprint with UA: {user_agent[:30]}... and IP: {ip}")
+    return fingerprint
+
 def generate_token(user_email):
-    """Generate a secure JWT token for the authenticated user"""
+    """Generate a secure JWT token with enhanced security features"""
+    # Generate a unique ID for this token
+    token_id = str(uuid.uuid4())
+
+    # Extract forwarded client details if present
+    forwarded_ip = request.headers.get('X-Original-Client-IP')
+    forwarded_ua = request.headers.get('X-Original-User-Agent')
+    
+    # Get client fingerprint using forwarded details when available for binding token to client
+    # This will be used to bind a token to the specific device and network that originally requested it. 
+    # This creates a defense against token theft attacks.
+    fingerprint = get_client_fingerprint(
+        override_ip=forwarded_ip,
+        override_user_agent=forwarded_ua
+    )
+    
+    # Create enhanced payload
     payload = {
-        'sub': user_email,
-        'iat': datetime.utcnow(),
-        'exp': datetime.utcnow() + timedelta(minutes=JWT_EXPIRATION)
+        'sub': user_email,                  # Subject (email)
+        'jti': token_id,                    # JWT ID (unique)
+        'iat': datetime.now(timezone.utc),           # Issued at
+        'exp': datetime.now(timezone.utc) + timedelta(minutes=JWT_EXPIRATION),  # Expiration
+        'iss': WORDPRESS_URL,               # Issuer
+        'aud': 'redcap-patient-data-api',   # Audience, without audience setting/checking token could be used in "token confusion" or "cross-service token replay" down the road if services have same JWT_SECRET
+        'fgp': fingerprint                  # Fingerprint
     }
+    
+    # (optional implementation) Store token in redis/database for potential revocation
+    # redis_client.setex(f"token:{token_id}", JWT_EXPIRATION * 60, "active")
+    
+    logger.info(f"Token generated for {user_email} with ID {token_id}")
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 def verify_token(token):
-    """Decode and verify a JWT token"""
+    """Decode and verify a JWT token with enhanced security checks"""
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        # Decode the token
+        payload = jwt.decode(
+            token, 
+            JWT_SECRET, 
+            algorithms=[JWT_ALGORITHM],
+            audience="redcap-patient-data-api",
+            issuer=WORDPRESS_URL
+        )
+        
+        # (optional implementation) Check for token in blacklist 
+        # token_status = redis_client.get(f"token:{payload['jti']}")
+        # if token_status is None or token_status.decode() != "active":
+        #     return None  # Token has been revoked or doesn't exist
+
+        # Verify the fingerprint if present
+        if 'fgp' in payload:
+            current_fingerprint = get_client_fingerprint()
+            if payload['fgp'] != current_fingerprint:
+                logger.warning(f"Token fingerprint mismatch: {payload['jti']}")
+                logger.debug(f"Expected: {payload['fgp']}, Got: {current_fingerprint}")
+                return None
+                
         return payload['sub']  # Return the user's email
     except jwt.ExpiredSignatureError:
+        logger.warning("Token expired")
         return None
-    except jwt.InvalidTokenError:
+    except jwt.InvalidTokenError as e:
+        logger.warning(f"Invalid token: {str(e)}")
         return None
 
 def token_required(f):
@@ -241,9 +317,6 @@ def verify_participant():
 @app.route('/auth/generate_token', methods=['POST'])
 def generate_token_endpoint():
     """Generate a token for an already authenticated WordPress user"""
-    # This function differs from the wordpress_auth function in that the latter expects username/password credentials, validates them against WordPress, and then generates a token. 
-    # This new endpoint assumes the user is already validated by WordPress and just needs a token. (per issue #18 for WP site-level 2FA/MFA compatability)
-
     try:
         # Extract request data
         data = request.get_json()
@@ -262,6 +335,15 @@ def generate_token_endpoint():
                 'message': 'Unauthorized',
                 'error_type': 'unauthorized'
             }), 401
+
+        # Log forwarded client details if present
+        forwarded_ip = request.headers.get('X-Original-Client-IP')
+        forwarded_ua = request.headers.get('X-Original-User-Agent')
+        
+        if forwarded_ip and forwarded_ua:
+            logger.info(f"Received forwarded client details: IP={forwarded_ip}, UA={forwarded_ua[:30]}...")
+        else:
+            logger.warning("No forwarded client details received, fingerprinting may fail later")
 
         # Log sanitized data
         logger.info(f"Token generation for email: {data.get('email', 'N/A')}")
@@ -574,7 +656,7 @@ def get_survey_metadata(user_email, survey_name):
 def log_access(user_email, access_type, data_requested):
     """Log all data access attempts for security auditing"""
     # In production, you'd want to store this in a database or secure log
-    app.logger.info(f"AUDIT: {datetime.utcnow()} - {user_email} - {access_type} - {data_requested}")
+    app.logger.info(f"AUDIT: {datetime.now(timezone.utc)} - {user_email} - {access_type} - {data_requested}")
 
 # Start the application
 if __name__ == '__main__':

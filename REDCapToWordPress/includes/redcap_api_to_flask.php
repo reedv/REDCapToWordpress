@@ -58,7 +58,9 @@ function verify_participant($email, $first_name, $last_name) {
     curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
     curl_setopt($ch, CURLOPT_HTTPHEADER, array(
         'Content-Type: application/json',
-        'X-API-KEY: ' . $middleware_api_key
+        'X-API-KEY: ' . $middleware_api_key,
+        'X-Original-Client-IP: ' . $_SERVER['REMOTE_ADDR'],
+        'X-Original-User-Agent: ' . $_SERVER['HTTP_USER_AGENT']
     ));
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
     
