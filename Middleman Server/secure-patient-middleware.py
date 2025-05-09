@@ -346,7 +346,7 @@ def generate_token_endpoint():
             logger.warning("No forwarded client details received, fingerprinting may fail later")
 
         # Log sanitized data
-        logger.info(f"Token generation for email: {data.get('email', 'N/A')}")
+        logger.info(f"Token generation requested for email: {data.get('email', 'N/A')}")
 
         # Validate required fields
         if 'email' not in data or not data['email']:
@@ -357,6 +357,22 @@ def generate_token_endpoint():
             }), 400
 
         user_email = data['email']
+
+        # Verify email exists in redcap records
+        redcap_data = {
+            'token': REDCAP_API_TOKEN,
+            'content': 'record',
+            'format': 'json',
+            'filterLogic': f"[email] = '{sanitize_for_redcap(user_email)}'",
+            'returnFormat': 'json'
+        }
+        redcap_response = requests.post(REDCAP_API_URL, data=redcap_data, verify=True)
+        records = redcap_response.json()
+        if not records:
+            return jsonify({
+                'message': 'User email not found in records', 
+                'error_type': 'user_not_found'
+            }), 404
         
         # Generate the token
         token = generate_token(user_email)
