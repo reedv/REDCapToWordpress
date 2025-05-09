@@ -70,29 +70,34 @@ class REDCapAuth {
         return { valid: false, error: 'No token available' };
       }
       
-      const response = await fetch(`${this.middlewareUrl}/auth/verify`, {
+      // Use WordPress plugin AJAX endpoint for requesting token verification 
+      const response = await fetch(redcapPortal.ajaxUrl, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/x-www-form-urlencoded'
         },
-        body: JSON.stringify({ token: this.token }),
-        credentials: 'include'
+        body: new URLSearchParams({
+          action: 'redcap_verify_token_with_fingerprint',
+          nonce: redcapPortal.nonce,
+          token: this.token
+        }),
+        credentials: 'same-origin'
       });
       
       const data = await response.json();
       
-      if (!response.ok) {
+      if (!data.success) {
         // Handle different error types
-        if (data.error === 'token_expired') {
+        if (data.data && data.data.error === 'token_expired') {
           this.logout(); // Clear expired token
           return { valid: false, error: 'Session expired', errorType: 'expired' };
         } else {
           this.logout(); // Clear invalid token
-          return { valid: false, error: 'Invalid session', errorType: 'invalid' };
+          return { valid: false, error: data.data.message || 'Invalid session', errorType: data.data.error || 'invalid' };
         }
       }
       
-      return { valid: true, user: data.user };
+      return { valid: true, user: data.data.user };
     } catch (error) {
       console.error('Token verification error:', error);
       return { valid: false, error: 'Verification failed', errorType: 'network' };

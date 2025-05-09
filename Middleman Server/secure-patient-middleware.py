@@ -160,7 +160,7 @@ def generate_token(user_email):
     logger.info(f"Token generated for {user_email} with ID {token_id}")
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
-def verify_token(token):
+def verify_token(token, forwarded_ip=None, forwarded_ua=None):
     """Decode and verify a JWT token with enhanced security checks"""
     try:
         # Decode the token
@@ -179,7 +179,10 @@ def verify_token(token):
 
         # Verify the fingerprint if present
         if 'fgp' in payload:
-            current_fingerprint = get_client_fingerprint()
+            current_fingerprint = get_client_fingerprint(
+                override_ip=forwarded_ip,
+                override_user_agent=forwarded_ua
+            )
             if payload['fgp'] != current_fingerprint:
                 logger.warning(f"Token fingerprint mismatch: {payload['jti']}")
                 logger.debug(f"Expected: {payload['fgp']}, Got: {current_fingerprint}")
@@ -416,9 +419,13 @@ def auth_verify():
                 'error': 'missing_token'
             }), 400
         
+        # Extract forwarded client details
+        forwarded_ip = request.headers.get('X-Original-Client-IP')
+        forwarded_ua = request.headers.get('X-Original-User-Agent')
+        
         # Get and verify the token
         token = data.get('token')
-        user_email = verify_token(token)
+        user_email = verify_token(token, forwarded_ip, forwarded_ua)
         
         if not user_email:
             logger.warning("Invalid or expired token verification attempt")

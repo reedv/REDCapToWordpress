@@ -46,9 +46,13 @@ class REDCap_Patient_Portal {
         add_action('admin_menu', array($this, 'add_admin_menu'));
         add_action('admin_init', array($this, 'register_settings'));
 
-        // Add AJAX handlers for verifying middleware access token
-        add_action('wp_ajax_redcap_verify_token', array($this, 'ajax_verify_token'));
-        add_action('wp_ajax_nopriv_redcap_verify_token', array($this, 'ajax_verify_token'));
+        // // Add AJAX handlers for verifying middleware access token
+        // add_action('wp_ajax_redcap_verify_token', array($this, 'ajax_verify_token'));
+        // add_action('wp_ajax_nopriv_redcap_verify_token', array($this, 'ajax_verify_token'));
+
+        // Add AJAX handler for middlware token verification
+        add_action('wp_ajax_redcap_verify_token_with_fingerprint', array($this, 'ajax_verify_token_with_fingerprint'));
+        add_action('wp_ajax_nopriv_redcap_verify_token_with_fingerprint', array($this, 'ajax_verify_token_with_fingerprint'));
 
         // Add the AJAX handler for user self-registration
         add_action('wp_ajax_nopriv_redcap_verify_and_register', array($this, 'ajax_verify_and_register'));
@@ -128,7 +132,7 @@ class REDCap_Patient_Portal {
                 'redcap-auth',
                 REDCAP_PORTAL_URL . 'js/auth.js',
                 array('jquery'),
-                REDCAP_PORTAL_VERSION,
+                REDCAP_PORTAL_VERSION . '.' . time(), // Force cache refresh with timestamp, wp site was caching this in internal asset cache and not using updated versions even after installing new plugin zip or clearing browser cache
                 true
             );
             
@@ -353,11 +357,11 @@ class REDCap_Patient_Portal {
             ));
         }
     }
-    
+
     /**
-     * AJAX handler to verify token and get patient info
+     * AJAX handler to verify token with original fingerprint and get patient user info
      */
-    public function ajax_verify_token() {
+    public function ajax_verify_token_with_fingerprint() {
         check_ajax_referer('redcap_portal_nonce', 'nonce');
         
         $token = isset($_POST['token']) ? sanitize_text_field($_POST['token']) : '';
@@ -367,10 +371,18 @@ class REDCap_Patient_Portal {
             return;
         }
         
+        // Capture client details for fingerprinting (same as in token generation)
+        $client_ip = $_SERVER['REMOTE_ADDR'];
+        $client_ua = $_SERVER['HTTP_USER_AGENT'];
+        
         // Verify token with middleware
         $response = wp_remote_post($this->middleware_url . '/auth/verify', array(
             'body' => json_encode(array('token' => $token)),
-            'headers' => array('Content-Type' => 'application/json'),
+            'headers' => array(
+                'Content-Type' => 'application/json',
+                'X-Original-Client-IP' => $client_ip,
+                'X-Original-User-Agent' => $client_ua
+            ),
             'timeout' => 15
         ));
         
@@ -399,6 +411,52 @@ class REDCap_Patient_Portal {
             ));
         }
     }
+    
+    // /**
+    //  * AJAX handler to verify token and get patient user info
+    //  */
+    // public function ajax_verify_token() {
+    //     check_ajax_referer('redcap_portal_nonce', 'nonce');
+        
+    //     $token = isset($_POST['token']) ? sanitize_text_field($_POST['token']) : '';
+        
+    //     if (empty($token)) {
+    //         wp_send_json_error(array('message' => 'No token provided', 'error' => 'missing_token'));
+    //         return;
+    //     }
+        
+    //     // Verify token with middleware
+    //     $response = wp_remote_post($this->middleware_url . '/auth/verify', array(
+    //         'body' => json_encode(array('token' => $token)),
+    //         'headers' => array('Content-Type' => 'application/json'),
+    //         'timeout' => 15
+    //     ));
+        
+    //     if (is_wp_error($response)) {
+    //         wp_send_json_error(array(
+    //             'message' => 'Error contacting middleware server',
+    //             'error' => 'server_connection'
+    //         ));
+    //         return;
+    //     }
+        
+    //     $status_code = wp_remote_retrieve_response_code($response);
+    //     $body = wp_remote_retrieve_body($response);
+    //     $data = json_decode($body, true);
+        
+    //     if ($status_code === 200 && isset($data['success']) && $data['success'] === true) {
+    //         wp_send_json_success($data);
+    //     } else {
+    //         // Pass along the specific error type from middleware
+    //         $error_type = isset($data['error']) ? $data['error'] : 'invalid_token';
+    //         $message = isset($data['message']) ? $data['message'] : 'Invalid token';
+            
+    //         wp_send_json_error(array(
+    //             'message' => $message,
+    //             'error' => $error_type
+    //         ));
+    //     }
+    // }
 
     /**
      * Shortcode to display self-registration form
