@@ -3,7 +3,8 @@
  */
 class REDCapPatientData {
   constructor(auth, middlewareUrl) {
-    console.log('REDCapPatientData initializing with:', { auth: !!auth, middlewareUrl })
+    // console.log('REDCapPatientData initializing with:', { auth: !!auth, middlewareUrl })
+    console.log('REDCapPatientData initializing with:', { auth: !!auth })  // log with middleware url hidden from client
     this.auth = auth;
     this.middlewareUrl = middlewareUrl;
     this.patientDataEndpoint = `${middlewareUrl}/patient/data`;
@@ -18,97 +19,128 @@ class REDCapPatientData {
    */
   async getPatientData() {
     try {
-      if (!this.auth.isAuthenticated()) {
-        // Verify token with server for extra security
-        const verificationResult = await this.auth.verifyToken();
-        if (!verificationResult.valid) {
-          return {
-            success: false,
-            error: verificationResult.error || 'User is not authenticated',
-            errorType: verificationResult.errorType || 'auth'
-          };
+        if (!this.auth.isAuthenticated()) {
+            // Verify token with server for extra security
+            const verificationResult = await this.auth.verifyToken();
+            if (!verificationResult.valid) {
+                return {
+                    success: false,
+                    error: verificationResult.error || 'User is not authenticated',
+                    errorType: verificationResult.errorType || 'auth'
+                };
+            }
         }
-      }
-      return {
-        success: false,
-        error: 'Full record access is disabled for security reasons. Please access specific surveys instead.',
-        errorType: 'access_restricted'
-      };
-      
-      const response = await fetch(this.patientDataEndpoint, {
-        method: 'GET',
-        headers: this.auth.getAuthHeaders(),
-        credentials: 'include'
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        // Handle specific error types
-        if (response.status === 401) {
-          this.auth.logout(); // Session expired or invalid
-          return {
-            success: false,
-            error: data.message || 'Authentication failed',
-            errorType: data.error || 'auth'
-          };
+        return {
+          success: false,
+          error: 'Full record access is disabled for security reasons. Please access specific surveys instead.',
+          errorType: 'access_restricted'
+        };
+        
+        // Use WordPress AJAX endpoint to contact middleware from WP server rather than client browser
+        const response = await fetch(redcapPortal.ajaxUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: new URLSearchParams({
+                action: 'redcap_get_patient_data',
+                nonce: redcapPortal.nonce,
+                token: this.auth.token
+            }),
+            credentials: 'same-origin'
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+            // Handle specific error types
+            if (data.data && data.data.error === 'auth_required') {
+                this.auth.logout(); // Session expired or invalid
+                return {
+                    success: false,
+                    error: data.data.message || 'Authentication failed',
+                    errorType: data.data.error || 'auth'
+                };
+            }
+            
+            return {
+                success: false,
+                error: data.data?.message || 'Failed to fetch patient data',
+                errorType: data.data?.error || 'api'
+            };
         }
         
         return {
-          success: false,
-          error: data.message || 'Failed to fetch patient data',
-          errorType: 'api'
+            success: true,
+            data: data.data.records
         };
-      }
-      
-      return {
-        success: true,
-        data: data.records
-      };
     } catch (error) {
-      console.error('Error fetching patient data:', error);
-      return {
-        success: false,
-        error: error.message || 'Failed to fetch patient data',
-        errorType: 'network'
-      };
+        console.error('Error fetching patient data:', error);
+        return {
+            success: false,
+            error: error.message || 'Failed to fetch patient data',
+            errorType: 'network'
+        };
     }
   }
   
-  /**
-   * Get specific survey results
-   */
   async getSurveyResults(surveyName) {
     try {
-      if (!this.auth.isAuthenticated()) {
-        throw new Error('User is not authenticated');
-      }
-      
-      // Sanitize survey name
-      surveyName = surveyName.trim();
-      
-      const response = await fetch(`${this.surveysEndpoint}/${surveyName}`, {
-        method: 'GET',
-        headers: this.auth.getAuthHeaders(),
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || `Failed to fetch ${surveyName} survey data`);
-      }
-      
-      const data = await response.json();
-      return {
-        success: true,
-        data: data.survey_data
-      };
+        if (!this.auth.isAuthenticated()) {
+            const verificationResult = await this.auth.verifyToken();
+            if (!verificationResult.valid) {
+                return {
+                    success: false,
+                    error: verificationResult.error || 'User is not authenticated',
+                    errorType: verificationResult.errorType || 'auth'
+                };
+            }
+        }
+        
+        // Sanitize survey name to prevent injection
+        surveyName = surveyName.trim();
+        
+        // Use WordPress AJAX endpoint to contact middleware from WP server rather than client browser
+        const response = await fetch(redcapPortal.ajaxUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: new URLSearchParams({
+                action: 'redcap_get_survey_results',
+                nonce: redcapPortal.nonce,
+                token: this.auth.token,
+                survey_name: surveyName
+            }),
+            credentials: 'same-origin'
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+            // Handle authentication errors specially to trigger logout
+            if (data.data && data.data.error === 'auth_required') {
+                this.auth.logout();
+            }
+            
+            return {
+                success: false,
+                error: data.data?.message || `Failed to fetch ${surveyName} survey data`,
+                errorType: data.data?.error || 'api'
+            };
+        }
+        
+        return {
+            success: true,
+            data: data.data.survey_data
+        };
     } catch (error) {
-      console.error(`Error fetching ${surveyName} survey:`, error);
-      return {
-        success: false,
-        error: error.message || `Failed to fetch ${surveyName} survey data`
-      };
+        console.error(`Error fetching ${surveyName} survey:`, error);
+        return {
+            success: false,
+            error: error.message || `Failed to fetch ${surveyName} survey data`,
+            errorType: 'network'
+        };
     }
   }
 
@@ -125,37 +157,46 @@ class REDCapPatientData {
             }
         }
         
-        const response = await fetch(`${this.metadataEndpoint}/${surveyName}`, {
-            method: 'GET',
-            headers: this.auth.getAuthHeaders(),
-            credentials: 'include'
+        // Use WordPress AJAX endpoint to contact middleware from WP server rather than client browser
+        const response = await fetch(redcapPortal.ajaxUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: new URLSearchParams({
+                action: 'redcap_get_survey_metadata',
+                nonce: redcapPortal.nonce,
+                token: this.auth.token,
+                survey_name: surveyName
+            }),
+            credentials: 'same-origin'
         });
         
         const data = await response.json();
         
-        if (!response.ok) {
-            if (response.status === 401) {
+        if (!data.success) {
+            if (data.data && data.data.error === 'auth_required') {
                 this.auth.logout();
                 return {
                     success: false,
-                    error: data.message || 'Authentication failed',
-                    errorType: data.error || 'auth'
+                    error: data.data.message || 'Authentication required',
+                    errorType: 'auth'
                 };
             }
             
             return {
                 success: false,
-                error: data.message || 'Failed to fetch survey metadata',
-                errorType: 'api'
+                error: data.data.message || 'Failed to fetch survey metadata',
+                errorType: data.data.error || 'api'
             };
         }
         
         return {
             success: true,
-            metadata: data.metadata,
-            instruments: data.instruments,
-            formEventMapping: data.formEventMapping,
-            hasFileFields: data.hasFileFields
+            metadata: data.data.metadata,
+            instruments: data.data.instruments,
+            formEventMapping: data.data.formEventMapping,
+            hasFileFields: data.data.hasFileFields
         };
     } catch (error) {
         console.error('Error fetching survey metadata:', error);

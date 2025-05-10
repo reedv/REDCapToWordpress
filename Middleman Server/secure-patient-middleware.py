@@ -50,7 +50,7 @@ REDCAP_API_URL = config.get("redcap_url", "")
 REDCAP_API_TOKEN = os.environ.get("REDCAP_API_TOKEN", "")
 JWT_SECRET = os.environ.get("JWT_SECRET", "default-only-for-development")
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRATION = 30  # Minutes
+JWT_EXPIRATION = 15  # Minutes
 WORDPRESS_URL = config.get("wordpress_url", "")
 WORDPRESS_API_URL = WORDPRESS_URL + "/wp-json/wp/v2"
 #ALLOWED_ORIGINS = config.get("allowed_origins", ["http://localhost", "https://yourwordpresssite.com"])
@@ -197,9 +197,10 @@ def verify_token(token, forwarded_ip=None, forwarded_ua=None):
         return None
 
 def token_required(f):
-    """Decorator to require a valid token for API endpoints"""
+    """Decorator to require a valid token for API endpoints with fingerprint verification"""
     @wraps(f)
     def decorated(*args, **kwargs):
+        # Extract token from Authorization header
         token = None
         auth_header = request.headers.get('Authorization')
         
@@ -208,12 +209,21 @@ def token_required(f):
             
         if not token:
             return jsonify({'message': 'Authentication token is missing'}), 401
-            
-        user_email = verify_token(token)
+        
+        # Extract forwarded client context identifiers for fingerprint verification
+        forwarded_ip = request.headers.get('X-Original-Client-IP')
+        forwarded_ua = request.headers.get('X-Original-User-Agent')
+        
+        # Pass the forwarded client context to verify_token
+        user_email = verify_token(token, forwarded_ip, forwarded_ua)
+        
         if not user_email:
+            logger.warning(f"Token verification failed for request to {request.path}")
             return jsonify({'message': 'Invalid or expired token'}), 401
             
+        # Token verified successfully, proceed with endpoint execution
         return f(user_email=user_email, *args, **kwargs)
+    
     return decorated
 
 # participant self-registration validation endpoint

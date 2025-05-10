@@ -62,6 +62,10 @@ class REDCap_Patient_Portal {
         add_action('wp_ajax_redcap_verify_wp_session', array($this, 'ajax_verify_wp_session'));
         add_action('wp_ajax_nopriv_redcap_verify_wp_session', array($this, 'ajax_verify_wp_session'));
 
+        add_action('wp_ajax_redcap_get_survey_metadata', array($this, 'ajax_get_survey_metadata'));
+        add_action('wp_ajax_redcap_get_survey_results', array($this, 'ajax_get_survey_results'));
+        add_action('wp_ajax_redcap_get_patient_data', array($this, 'ajax_get_patient_data'));
+
     }
     
     /**
@@ -411,52 +415,147 @@ class REDCap_Patient_Portal {
             ));
         }
     }
-    
-    // /**
-    //  * AJAX handler to verify token and get patient user info
-    //  */
-    // public function ajax_verify_token() {
-    //     check_ajax_referer('redcap_portal_nonce', 'nonce');
+
+    /**
+     * Handle middleware response consistently
+     */
+    private function handle_middleware_response($response) {
+        if (is_wp_error($response)) {
+            wp_send_json_error(array(
+                'message' => 'Error contacting middleware server',
+                'error' => 'server_connection'
+            ));
+            return;
+        }
         
-    //     $token = isset($_POST['token']) ? sanitize_text_field($_POST['token']) : '';
+        $status_code = wp_remote_retrieve_response_code($response);
+        $body = wp_remote_retrieve_body($response);
         
-    //     if (empty($token)) {
-    //         wp_send_json_error(array('message' => 'No token provided', 'error' => 'missing_token'));
-    //         return;
-    //     }
+        if ($status_code === 200) {
+            wp_send_json_success(json_decode($body, true));
+        } else {
+            $error_data = json_decode($body, true);
+            wp_send_json_error(array(
+                'message' => $error_data['message'] ?? 'Error accessing data',
+                'error' => $error_data['error'] ?? 'api_error'
+            ));
+        }
+    }
+
+    /**
+     * AJAX handler to get survey metadata
+     */
+    public function ajax_get_survey_metadata() {
+        check_ajax_referer('redcap_portal_nonce', 'nonce');
         
-    //     // Verify token with middleware
-    //     $response = wp_remote_post($this->middleware_url . '/auth/verify', array(
-    //         'body' => json_encode(array('token' => $token)),
-    //         'headers' => array('Content-Type' => 'application/json'),
-    //         'timeout' => 15
-    //     ));
+        // Require authentication
+        if (!is_user_logged_in()) {
+            wp_send_json_error(array('message' => 'Not authenticated', 'error' => 'auth_required'));
+            return;
+        }
         
-    //     if (is_wp_error($response)) {
-    //         wp_send_json_error(array(
-    //             'message' => 'Error contacting middleware server',
-    //             'error' => 'server_connection'
-    //         ));
-    //         return;
-    //     }
+        $token = isset($_POST['token']) ? sanitize_text_field($_POST['token']) : '';
+        $survey_name = isset($_POST['survey_name']) ? sanitize_text_field($_POST['survey_name']) : '';
         
-    //     $status_code = wp_remote_retrieve_response_code($response);
-    //     $body = wp_remote_retrieve_body($response);
-    //     $data = json_decode($body, true);
+        if (empty($token) || empty($survey_name)) {
+            wp_send_json_error(array('message' => 'Missing required parameters', 'error' => 'invalid_request'));
+            return;
+        }
         
-    //     if ($status_code === 200 && isset($data['success']) && $data['success'] === true) {
-    //         wp_send_json_success($data);
-    //     } else {
-    //         // Pass along the specific error type from middleware
-    //         $error_type = isset($data['error']) ? $data['error'] : 'invalid_token';
-    //         $message = isset($data['message']) ? $data['message'] : 'Invalid token';
-            
-    //         wp_send_json_error(array(
-    //             'message' => $message,
-    //             'error' => $error_type
-    //         ));
-    //     }
-    // }
+        // Capture client details for fingerprinting
+        $client_ip = $_SERVER['REMOTE_ADDR'];
+        $client_ua = $_SERVER['HTTP_USER_AGENT'];
+        
+        // Forward request to middleware
+        $response = wp_remote_get($this->middleware_url . '/patient/survey_metadata/' . $survey_name, array(
+            'headers' => array(
+                'Authorization' => 'Bearer ' . $token,
+                'Content-Type' => 'application/json',
+                'X-Original-Client-IP' => $client_ip,
+                'X-Original-User-Agent' => $client_ua
+            ),
+            'timeout' => 15
+        ));
+        
+        $this->handle_middleware_response($response);
+    }
+
+    /**
+     * AJAX handler to get survey results
+     */
+    public function ajax_get_survey_results() {
+        check_ajax_referer('redcap_portal_nonce', 'nonce');
+        
+        // Require authentication
+        if (!is_user_logged_in()) {
+            wp_send_json_error(array('message' => 'Not authenticated', 'error' => 'auth_required'));
+            return;
+        }
+        
+        $token = isset($_POST['token']) ? sanitize_text_field($_POST['token']) : '';
+        $survey_name = isset($_POST['survey_name']) ? sanitize_text_field($_POST['survey_name']) : '';
+        
+        if (empty($token) || empty($survey_name)) {
+            wp_send_json_error(array('message' => 'Missing required parameters', 'error' => 'invalid_request'));
+            return;
+        }
+        
+        // Capture client details for fingerprinting
+        $client_ip = $_SERVER['REMOTE_ADDR'];
+        $client_ua = $_SERVER['HTTP_USER_AGENT'];
+        
+        // Forward request to middleware
+        $response = wp_remote_get($this->middleware_url . '/patient/surveys/' . $survey_name, array(
+            'headers' => array(
+                'Authorization' => 'Bearer ' . $token,
+                'Content-Type' => 'application/json',
+                'X-Original-Client-IP' => $client_ip,
+                'X-Original-User-Agent' => $client_ua
+            ),
+            'timeout' => 15
+        ));
+        
+        $this->handle_middleware_response($response);
+    }
+
+    /**
+     * AJAX handler to get patient data
+     */
+    public function ajax_get_patient_data() {
+        check_ajax_referer('redcap_portal_nonce', 'nonce');
+        
+        // Verify user authentication status within WordPress
+        if (!is_user_logged_in()) {
+            wp_send_json_error(array('message' => 'Not authenticated', 'error' => 'auth_required'));
+            return;
+        }
+        
+        // Extract and sanitize the JWT token from POST data
+        $token = isset($_POST['token']) ? sanitize_text_field($_POST['token']) : '';
+        
+        if (empty($token)) {
+            wp_send_json_error(array('message' => 'Missing token parameter', 'error' => 'invalid_request'));
+            return;
+        }
+        
+        // Capture original client context for fingerprint verification
+        $client_ip = $_SERVER['REMOTE_ADDR'];
+        $client_ua = $_SERVER['HTTP_USER_AGENT'];
+        
+        // Forward request to middleware with preserved client context
+        $response = wp_remote_get($this->middleware_url . '/patient/data', array(
+            'headers' => array(
+                'Authorization' => 'Bearer ' . $token,
+                'Content-Type' => 'application/json',
+                'X-Original-Client-IP' => $client_ip,
+                'X-Original-User-Agent' => $client_ua
+            ),
+            'timeout' => 15
+        ));
+        
+        // Process the middleware response through the shared handler
+        $this->handle_middleware_response($response);
+    }
 
     /**
      * Shortcode to display self-registration form
