@@ -91,8 +91,10 @@ def add_cors_headers(response):
     if origin in ALLOWED_ORIGINS:
         response.headers['Access-Control-Allow-Origin'] = origin
         response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Original-Client-IP, X-Original-User-Agent'
         response.headers['Access-Control-Allow-Credentials'] = 'true'
+        # This is important for cookie-based auth with different domains
+        # However, credentials will be sent from WordPress server to middleware, not directly from browser
     return response
 
 @app.route('/options', methods=['OPTIONS'])

@@ -27,6 +27,14 @@ class REDCap_Patient_Portal {
      * Plugin initialization
      */
     public function __construct() {
+        // Force HTTPS for all requests
+        if (!is_ssl() && !WP_DEBUG) {
+            if (isset($_SERVER['HTTP_HOST']) && isset($_SERVER['REQUEST_URI'])) {
+                wp_redirect('https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'], 301);
+                exit;
+            }
+        }
+
         // Load settings
         $this->load_settings();
         
@@ -53,6 +61,11 @@ class REDCap_Patient_Portal {
         // Add AJAX handler for middlware token verification
         add_action('wp_ajax_redcap_verify_token_with_fingerprint', array($this, 'ajax_verify_token_with_fingerprint'));
         add_action('wp_ajax_nopriv_redcap_verify_token_with_fingerprint', array($this, 'ajax_verify_token_with_fingerprint'));
+
+        add_action('wp_ajax_redcap_check_token_cookie', array($this, 'ajax_check_token_cookie'));
+        add_action('wp_ajax_nopriv_redcap_check_token_cookie', array($this, 'ajax_check_token_cookie'));
+        add_action('wp_ajax_redcap_clear_token_cookie', array($this, 'ajax_clear_token_cookie'));
+        add_action('wp_ajax_nopriv_redcap_clear_token_cookie', array($this, 'ajax_clear_token_cookie'));
 
         // Add the AJAX handler for user self-registration
         add_action('wp_ajax_nopriv_redcap_verify_and_register', array($this, 'ajax_verify_and_register'));
@@ -276,7 +289,7 @@ class REDCap_Patient_Portal {
      */
     public function ajax_verify_wp_session() {
         check_ajax_referer('redcap_verify_wp_session', 'nonce');
-        
+    
         // Check if user is logged in
         if (!is_user_logged_in()) {
             wp_send_json_error(array('message' => 'Not logged in'));
@@ -350,9 +363,45 @@ class REDCap_Patient_Portal {
         $data = json_decode($body, true);
         
         if ($status_code === 200 && isset($data['token'])) {
+            // Set secure HttpOnly cookie with token
+            $cookie_expiry = time() + ($data['expiresIn'] ?? 1800); // 30 minutes default
+            $cookie_secure = is_ssl(); // Only send over HTTPS
+            $cookie_domain = parse_url(home_url(), PHP_URL_HOST);
+            $cookie_path = '/';
+            $cookie_httponly = true;
+            $cookie_samesite = 'Strict'; // Prevent CSRF attacks
+            
+            // Set the token cookie
+            setcookie(
+                'redcap_token',
+                $data['token'],
+                [
+                    'expires' => $cookie_expiry,
+                    'path' => $cookie_path,
+                    'domain' => $cookie_domain,
+                    'secure' => $cookie_secure,
+                    'httponly' => $cookie_httponly,
+                    'samesite' => $cookie_samesite
+                ]
+            );
+            
+            // Set a separate cookie for expiry time that JavaScript can access
+            setcookie(
+                'redcap_token_expiry',
+                $cookie_expiry,
+                [
+                    'expires' => $cookie_expiry,
+                    'path' => $cookie_path,
+                    'domain' => $cookie_domain,
+                    'secure' => $cookie_secure,
+                    'httponly' => false, // JavaScript needs to check this
+                    'samesite' => $cookie_samesite
+                ]
+            );
+            
             wp_send_json_success(array(
-                'token' => $data['token'],
-                'expiresIn' => $data['expiresIn'] ?? 1800 // 30 minutes default
+                'message' => 'Authentication successful',
+                'expiresIn' => $data['expiresIn'] ?? 1800
             ));
         } else {
             wp_send_json_error(array(
@@ -417,6 +466,61 @@ class REDCap_Patient_Portal {
     }
 
     /**
+     * AJAX handler to check if token cookie exists and is valid
+     */
+    public function ajax_check_token_cookie() {
+        check_ajax_referer('redcap_portal_nonce', 'nonce');
+        
+        // Check if token cookie exists
+        if (!isset($_COOKIE['redcap_token']) || !isset($_COOKIE['redcap_token_expiry'])) {
+            wp_send_json_error(array('message' => 'No token cookie found', 'error' => 'no_token'));
+            return;
+        }
+        
+        // Check if token is expired
+        $expiry = intval($_COOKIE['redcap_token_expiry']);
+        if ($expiry < time()) {
+            wp_send_json_error(array('message' => 'Token expired', 'error' => 'token_expired'));
+            return;
+        }
+        
+        // Token exists and is not expired
+        wp_send_json_success(array('valid' => true));
+    }
+
+    /**
+     * AJAX handler to log out (clear the token cookie)
+     */
+    public function ajax_clear_token_cookie() {
+        check_ajax_referer('redcap_portal_nonce', 'nonce');
+        
+        $cookie_domain = parse_url(home_url(), PHP_URL_HOST);
+        $cookie_path = '/';
+        
+        // Clear the token cookie
+        setcookie('redcap_token', '', [
+            'expires' => time() - 3600,
+            'path' => $cookie_path,
+            'domain' => $cookie_domain,
+            'secure' => is_ssl(),
+            'httponly' => true,
+            'samesite' => 'Strict'
+        ]);
+        
+        // Clear the expiry cookie
+        setcookie('redcap_token_expiry', '', [
+            'expires' => time() - 3600,
+            'path' => $cookie_path,
+            'domain' => $cookie_domain,
+            'secure' => is_ssl(),
+            'httponly' => false,
+            'samesite' => 'Strict'
+        ]);
+        
+        wp_send_json_success(array('message' => 'Logged out successfully'));
+    }
+
+    /**
      * Handle middleware response consistently
      */
     private function handle_middleware_response($response) {
@@ -454,11 +558,16 @@ class REDCap_Patient_Portal {
             return;
         }
         
-        $token = isset($_POST['token']) ? sanitize_text_field($_POST['token']) : '';
         $survey_name = isset($_POST['survey_name']) ? sanitize_text_field($_POST['survey_name']) : '';
         
-        if (empty($token) || empty($survey_name)) {
+        if (empty($survey_name)) {
             wp_send_json_error(array('message' => 'Missing required parameters', 'error' => 'invalid_request'));
+            return;
+        }
+        
+        // Check if token cookie exists
+        if (!isset($_COOKIE['redcap_token'])) {
+            wp_send_json_error(array('message' => 'Authentication required', 'error' => 'auth_required'));
             return;
         }
         
@@ -466,10 +575,10 @@ class REDCap_Patient_Portal {
         $client_ip = $_SERVER['REMOTE_ADDR'];
         $client_ua = $_SERVER['HTTP_USER_AGENT'];
         
-        // Forward request to middleware
+        // Forward request to middleware with token from cookie
         $response = wp_remote_get($this->middleware_url . '/patient/survey_metadata/' . $survey_name, array(
             'headers' => array(
-                'Authorization' => 'Bearer ' . $token,
+                'Authorization' => 'Bearer ' . $_COOKIE['redcap_token'],
                 'Content-Type' => 'application/json',
                 'X-Original-Client-IP' => $client_ip,
                 'X-Original-User-Agent' => $client_ua
@@ -492,11 +601,16 @@ class REDCap_Patient_Portal {
             return;
         }
         
-        $token = isset($_POST['token']) ? sanitize_text_field($_POST['token']) : '';
         $survey_name = isset($_POST['survey_name']) ? sanitize_text_field($_POST['survey_name']) : '';
         
-        if (empty($token) || empty($survey_name)) {
+        if (empty($survey_name)) {
             wp_send_json_error(array('message' => 'Missing required parameters', 'error' => 'invalid_request'));
+            return;
+        }
+        
+        // Check if token cookie exists
+        if (!isset($_COOKIE['redcap_token'])) {
+            wp_send_json_error(array('message' => 'Authentication required', 'error' => 'auth_required'));
             return;
         }
         
@@ -504,10 +618,10 @@ class REDCap_Patient_Portal {
         $client_ip = $_SERVER['REMOTE_ADDR'];
         $client_ua = $_SERVER['HTTP_USER_AGENT'];
         
-        // Forward request to middleware
+        // Forward request to middleware with token from cookie
         $response = wp_remote_get($this->middleware_url . '/patient/surveys/' . $survey_name, array(
             'headers' => array(
-                'Authorization' => 'Bearer ' . $token,
+                'Authorization' => 'Bearer ' . $_COOKIE['redcap_token'],
                 'Content-Type' => 'application/json',
                 'X-Original-Client-IP' => $client_ip,
                 'X-Original-User-Agent' => $client_ua
@@ -530,11 +644,9 @@ class REDCap_Patient_Portal {
             return;
         }
         
-        // Extract and sanitize the JWT token from POST data
-        $token = isset($_POST['token']) ? sanitize_text_field($_POST['token']) : '';
-        
-        if (empty($token)) {
-            wp_send_json_error(array('message' => 'Missing token parameter', 'error' => 'invalid_request'));
+        // Check if token cookie exists
+        if (!isset($_COOKIE['redcap_token'])) {
+            wp_send_json_error(array('message' => 'Authentication required', 'error' => 'auth_required'));
             return;
         }
         
@@ -545,7 +657,7 @@ class REDCap_Patient_Portal {
         // Forward request to middleware with preserved client context
         $response = wp_remote_get($this->middleware_url . '/patient/data', array(
             'headers' => array(
-                'Authorization' => 'Bearer ' . $token,
+                'Authorization' => 'Bearer ' . $_COOKIE['redcap_token'],
                 'Content-Type' => 'application/json',
                 'X-Original-Client-IP' => $client_ip,
                 'X-Original-User-Agent' => $client_ua

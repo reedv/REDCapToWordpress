@@ -1,103 +1,79 @@
 /**
  * Handles secure authentication between WordPress and the middleware
+ * Using HttpOnly cookies for token storage
  */
 class REDCapAuth {
   constructor(middlewareUrl) {
     this.middlewareUrl = middlewareUrl;
-    this.token = null;
-    this.tokenExpiry = null;
+    this.tokenExpiryTime = null;
     
-    // Try to restore token from sessionStorage
-    this.restoreSession();
+    // Get expiry time from the non-HttpOnly cookie
+    this.checkTokenExpiry();
     
     // Set up token refresh interval
     setInterval(() => this.checkTokenExpiry(), 60000); // Check every minute
   }
   
   /**
-   * Restore session from storage if available
+   * Get token expiry from cookie
    */
-  restoreSession() {
-    const savedToken = sessionStorage.getItem('redcap_token');
-    const savedExpiry = sessionStorage.getItem('redcap_token_expiry');
-    
-    if (savedToken && savedExpiry) {
-      // Check if token is still valid
-      const expiryDate = new Date(parseInt(savedExpiry));
-      if (expiryDate > new Date()) {
-        this.token = savedToken;
-        this.tokenExpiry = expiryDate;
-        return true;
-      }
-    }
-    
-    return false;
+  getTokenExpiry() {
+    const cookieValue = this.getCookie('redcap_token_expiry');
+    return cookieValue ? parseInt(cookieValue) : null;
   }
   
   /**
-   * Save auth session to storage
+   * Helper to get cookie by name
    */
-  saveSession(token, expiresIn) {
-    const expiryTime = Date.now() + (expiresIn * 1000);
-    this.token = token;
-    this.tokenExpiry = new Date(expiryTime);
-    
-    sessionStorage.setItem('redcap_token', token);
-    sessionStorage.setItem('redcap_token_expiry', expiryTime.toString());
+  getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return null;
   }
   
   /**
-   * Log out - clear token and storage
-   */
-  logout() {
-    this.token = null;
-    this.tokenExpiry = null;
-    sessionStorage.removeItem('redcap_token');
-    sessionStorage.removeItem('redcap_token_expiry');
-    return true;
-  }
-  
-  /**
-   * Check if user is authenticated
+   * Check if authentication cookies exist
    */
   isAuthenticated() {
-    return this.token !== null && this.tokenExpiry > new Date();
+    // Check for expiry cookie (the HttpOnly token cookie can't be checked via JS)
+    const expiryTime = this.getTokenExpiry();
+    if (!expiryTime) return false;
+    
+    // Check if it's expired
+    return expiryTime * 1000 > Date.now();
   }
 
+  /**
+   * Verify token with server
+   */
   async verifyToken() {
     try {
-      if (!this.token) {
-        return { valid: false, error: 'No token available' };
-      }
-      
-      // Use WordPress plugin AJAX endpoint for requesting token verification 
+      // Ask the server to check if the HttpOnly cookie is valid
       const response = await fetch(redcapPortal.ajaxUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
         },
         body: new URLSearchParams({
-          action: 'redcap_verify_token_with_fingerprint',
-          nonce: redcapPortal.nonce,
-          token: this.token
+          action: 'redcap_check_token_cookie',
+          nonce: redcapPortal.nonce
         }),
-        credentials: 'same-origin'
+        credentials: 'same-origin' // Include cookies
       });
       
       const data = await response.json();
       
       if (!data.success) {
         // Handle different error types
-        if (data.data && data.data.error === 'token_expired') {
-          this.logout(); // Clear expired token
-          return { valid: false, error: 'Session expired', errorType: 'expired' };
-        } else {
-          this.logout(); // Clear invalid token
-          return { valid: false, error: data.data.message || 'Invalid session', errorType: data.data.error || 'invalid' };
-        }
+        return { 
+          valid: false, 
+          error: data.data?.message || 'Invalid session', 
+          errorType: data.data?.error || 'invalid' 
+        };
       }
       
-      return { valid: true, user: data.data.user };
+      return { valid: true };
     } catch (error) {
       console.error('Token verification error:', error);
       return { valid: false, error: 'Verification failed', errorType: 'network' };
@@ -108,16 +84,17 @@ class REDCapAuth {
    * Check token expiry and handle refresh if needed
    */
   async checkTokenExpiry() {
-    if (!this.token || !this.tokenExpiry) {
-      return false;
-    }
+    // Get expiry from cookie
+    const expiryTime = this.getTokenExpiry();
+    if (!expiryTime) return false;
     
     // If token expires in less than 5 minutes, verify with server
-    if (this.tokenExpiry.getTime() - Date.now() < 300000) {
+    if (expiryTime * 1000 - Date.now() < 300000) {
       const verificationResult = await this.verifyToken();
       
       if (!verificationResult.valid) {
-        this.logout();
+        // Clear cookies via server action
+        await this.logout();
         
         // Notify the user they need to log in again
         if (document.getElementById('redcap-session-expired-alert')) {
@@ -134,7 +111,31 @@ class REDCapAuth {
   }
   
   /**
-   * Get auth headers for API calls
+   * Log out - clear cookies through server action
+   */
+  async logout() {
+    try {
+      await fetch(redcapPortal.ajaxUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          action: 'redcap_clear_token_cookie',
+          nonce: redcapPortal.nonce
+        }),
+        credentials: 'same-origin' // Include cookies
+      });
+      return true;
+    } catch (error) {
+      console.error('Logout error:', error);
+      return false;
+    }
+  }
+  
+  /**
+   * Get auth headers for API calls - not needed for direct token access
+   * Instead, cookies will be sent automatically
    */
   getAuthHeaders() {
     if (!this.isAuthenticated()) {
@@ -142,7 +143,6 @@ class REDCapAuth {
     }
     
     return {
-      'Authorization': `Bearer ${this.token}`,
       'Content-Type': 'application/json'
     };
   }

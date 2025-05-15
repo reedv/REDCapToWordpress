@@ -42,9 +42,7 @@ if (is_user_logged_in()) {
                 },
                 success: function(response) {
                     if (response.success) {
-                        // Initialize auth object with the token
-                        const redcapAuth = new REDCapAuth(redcapPortal.middlewareUrl);
-                        redcapAuth.saveSession(response.data.token, response.data.expiresIn);
+                        // Authentication successful, token is now in HttpOnly cookie
                         window.location.href = '<?php echo $redirect_url; ?>';
                     } else {
                         $('#redcap-login-container').html(

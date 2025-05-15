@@ -103,64 +103,46 @@ jQuery(document).ready(function($) {
     const redcapAuth = new REDCapAuth(redcapPortal.middlewareUrl);
     const redcapData = new REDCapPatientData(redcapAuth, redcapPortal.middlewareUrl);
 
-    (async function() {
-      const verificationResult = await redcapAuth.verifyToken();
-      if (!verificationResult.valid) {
+    // Check authentication and initialize the page
+    (async function initializePortal() {
+        // Verify token with the server rather than relying on client-side check
+        const verificationResult = await redcapAuth.verifyToken();
+        
+        if (!verificationResult.valid) {
+            // Not authenticated or token expired - show login message
+            $('#redcap-portal-content').html(
+                '<div class="redcap-error-message">' +
+                (verificationResult.errorType === 'expired' ? 
+                    '<?php echo esc_js(__('Your session has expired. Please log in again.', 'redcap-patient-portal')); ?>' : 
+                    '<?php echo esc_js(__('Authentication error. Please log in again.', 'redcap-patient-portal')); ?>') +
+                '</div>' +
+                '<p><a href="<?php echo esc_js(site_url('/login')); ?>" class="redcap-button redcap-primary-button">' +
+                '<?php echo esc_js(__('Log In', 'redcap-patient-portal')); ?>' +
+                '</a></p>'
+            );
+            return; // Exit the function - don't proceed with loading data
+        }
+        
+        // User is authenticated, show the portal sections
         $('#redcap-portal-content').html(
-          '<div class="redcap-error-message">' +
-          (verificationResult.errorType === 'expired' ? 
-            '<?php echo esc_js(__('Your session has expired. Please log in again.', 'redcap-patient-portal')); ?>' : 
-            '<?php echo esc_js(__('Authentication error. Please log in again.', 'redcap-patient-portal')); ?>') +
-          '</div>' +
-          '<p><a href="<?php echo esc_js(site_url('/login')); ?>" class="redcap-button redcap-primary-button">' +
-          '<?php echo esc_js(__('Log In', 'redcap-patient-portal')); ?>' +
-          '</a></p>'
+            '<div class="redcap-welcome-message">' +
+            '<?php echo esc_js(__('Welcome to your secure health data portal.', 'redcap-patient-portal')); ?>' +
+            '</div>'
         );
-        return;
-      }
-    })();
-    
-    function debugLog(message) {
-        <?php if ($show_debug): ?>
-        $('#redcap-debug-log').append('<div class="debug-item">' + message + '</div>');
-        console.log('REDCap Portal:', message);
+        
+        <?php if ($show_profile): ?>
+        $('#redcap-patient-profile').show();
         <?php endif; ?>
-    }
-    
-    // Check authentication
-    if (!redcapAuth.isAuthenticated()) {
-        $('#redcap-portal-content').html(
-            '<div class="redcap-error-message">' +
-            '<?php echo esc_js(__('You need to log in to view your health data.', 'redcap-patient-portal')); ?>' +
-            '</div>' +
-            '<p><a href="<?php echo esc_js(site_url('/login')); ?>" class="redcap-button redcap-primary-button">' +
-            '<?php echo esc_js(__('Log In', 'redcap-patient-portal')); ?>' +
-            '</a></p>'
-        );
-        return;
-    }
-    
-    // User is authenticated, show the portal sections
-    $('#redcap-portal-content').html(
-        '<div class="redcap-welcome-message">' +
-        '<?php echo esc_js(__('Welcome to your secure health data portal.', 'redcap-patient-portal')); ?>' +
-        '</div>'
-    );
-    
-    <?php if ($show_profile): ?>
-    $('#redcap-patient-profile').show();
-    <?php endif; ?>
-    
-    <?php if (!empty($survey)): ?>
-    $('#redcap-survey-results').show();
-    <?php endif; ?>
-    
-    $('#redcap-all-data').show();
-    $('#redcap-portal-actions').show();
-    
-    // Load patient profile if enabled
-    <?php if ($show_profile): ?>
-    (async function loadProfile() {
+        
+        <?php if (!empty($survey)): ?>
+        $('#redcap-survey-results').show();
+        <?php endif; ?>
+        
+        $('#redcap-all-data').show();
+        $('#redcap-portal-actions').show();
+        
+        // Load patient profile if enabled
+        <?php if ($show_profile): ?>
         try {
             debugLog('Loading patient profile...');
             const result = await redcapData.getPatientData();
@@ -217,12 +199,10 @@ jQuery(document).ready(function($) {
             );
             debugLog('Profile load exception: ' + error.message);
         }
-    })();
-    <?php endif; ?>
-    
-    // Load specific survey data if specified
-    <?php if (!empty($survey)): ?>
-    (async function loadSurvey() {
+        <?php endif; ?>
+        
+        // Load specific survey data if specified
+        <?php if (!empty($survey)): ?>
         try {
             debugLog('Loading survey: <?php echo esc_js($survey); ?>');
             
@@ -579,11 +559,9 @@ jQuery(document).ready(function($) {
             );
             debugLog('Survey load exception: ' + error.message);
         }
-    })();
-    <?php endif; ?>
-    
-    // Load all patient data
-    (async function loadAllData() {
+        <?php endif; ?>
+        
+        // Load all patient data
         try {
             debugLog('Loading all patient data...');
             const result = await redcapData.getPatientData();
@@ -716,9 +694,16 @@ jQuery(document).ready(function($) {
         }
     })();
     
+    function debugLog(message) {
+        <?php if ($show_debug): ?>
+        $('#redcap-debug-log').append('<div class="debug-item">' + message + '</div>');
+        console.log('REDCap Portal:', message);
+        <?php endif; ?>
+    }
+    
     // Logout button
-    $('#redcap-logout-button').on('click', function() {
-        redcapAuth.logout();
+    $('#redcap-logout-button').on('click', async function() {
+        await redcapAuth.logout();
         window.location.href = '<?php echo esc_js(site_url('/login')); ?>';
     });
 });

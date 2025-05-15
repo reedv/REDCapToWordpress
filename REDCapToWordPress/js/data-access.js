@@ -214,12 +214,8 @@ class REDCapPatientData {
         return null;
     }
     
-    // Extract appropriate authentication from headers
-    const headers = this.auth.getAuthHeaders();
-    const authHeader = headers.Authorization || '';
-    const token = authHeader.replace('Bearer ', '');
-    
-    return `${this.fileEndpoint}/${recordId}/${fieldName}?token=${token}`;
+    // Cookie will/should be sent automatically, so no need for direct token access
+    return `${this.fileEndpoint}/${recordId}/${fieldName}`;
   }
   
   /**
