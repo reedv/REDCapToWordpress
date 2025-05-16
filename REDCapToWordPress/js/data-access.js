@@ -44,8 +44,8 @@ class REDCapPatientData {
             },
             body: new URLSearchParams({
                 action: 'redcap_get_patient_data',
-                nonce: redcapPortal.nonce,
-                token: this.auth.token
+                nonce: redcapPortal.nonce
+                // Token is sent automatically via HTTP-only cookie
             }),
             credentials: 'same-origin'
         });
@@ -109,7 +109,7 @@ class REDCapPatientData {
             body: new URLSearchParams({
                 action: 'redcap_get_survey_results',
                 nonce: redcapPortal.nonce,
-                token: this.auth.token,
+                // Token is sent automatically via HTTP-only cookie
                 survey_name: surveyName
             }),
             credentials: 'same-origin'
@@ -166,7 +166,7 @@ class REDCapPatientData {
             body: new URLSearchParams({
                 action: 'redcap_get_survey_metadata',
                 nonce: redcapPortal.nonce,
-                token: this.auth.token,
+                // Token is sent automatically via HTTP-only cookie
                 survey_name: surveyName
             }),
             credentials: 'same-origin'

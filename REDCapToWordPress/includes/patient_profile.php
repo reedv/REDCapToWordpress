@@ -1,4 +1,5 @@
-<?php
+<!-- DEPRECIATED, see issue #32 -->
+<!-- ?php
 
 function proband_link(){
 	global $redcap_load_loader_css;
@@ -38,4 +39,4 @@ function proband_link(){
 add_shortcode('my_account', 'proband_link');
 
 
-?>
+?-->

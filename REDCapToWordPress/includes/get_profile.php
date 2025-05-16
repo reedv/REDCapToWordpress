@@ -1,4 +1,5 @@
-<?php
+<!-- DEPRECIATED, see issue #32 -->
+<!--?php
 
 include 'RedCap_API_to_Flask.php';
 
@@ -56,4 +57,4 @@ echo '<style>
     th { background-color: #f2f2f2; text-align: left; }
     tr:nth-child(even) { background-color: #f9f9f9; }
 </style>';
-?>
+?-->

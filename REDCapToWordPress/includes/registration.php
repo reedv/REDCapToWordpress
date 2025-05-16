@@ -77,7 +77,7 @@ function load_registration_form() {
 			
 			$output = registration_form_fields();
 		} else {
-			wp_redirect("/my_account");
+			wp_redirect("/my-data");
 			exit;
 		}
 		return $output;

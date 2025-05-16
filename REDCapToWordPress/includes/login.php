@@ -42,7 +42,7 @@ function redcap_login_form() {
 		$output = redcap_login_form_fields();
 	} 
 	else if ($_SESSION["level"] >=9 ){ wp_redirect("/registration"); exit;}
-	else {wp_redirect("/my_account"); exit;}
+	else {wp_redirect("/my-data"); exit;}
 	
 	return $output;
 }
@@ -93,7 +93,7 @@ function redcap_login_member() {
 			$_SESSION["level"] = $user->user_level;
 			$_SESSION["email"] = $user->user_email;
  			if ($_SESSION["level"] >=9 ){wp_redirect("/registration"); exit;}
-			else {wp_redirect("/my_account"); exit;}
+			else {wp_redirect("/my-data"); exit;}
 		}
 	}
 }
