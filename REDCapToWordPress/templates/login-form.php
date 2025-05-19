@@ -81,11 +81,9 @@ if (is_user_logged_in()) {
                     <?php echo esc_html__('Log In with WordPress', 'redcap-patient-portal'); ?>
                 </a>
                 
-                <?php if (get_option('users_can_register')): ?>
-                <a href="<?php echo esc_url(wp_registration_url()); ?>" class="redcap-register-link">
+                <a href="<?php echo esc_url(site_url('/register')); ?>" class="redcap-register-link">
                     <?php echo esc_html__('Register', 'redcap-patient-portal'); ?>
                 </a>
-                <?php endif; ?>
             </div>
         </div>
     </div>

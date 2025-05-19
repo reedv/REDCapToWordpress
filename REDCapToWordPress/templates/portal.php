@@ -27,17 +27,16 @@ $options = get_option('redcap_portal_settings');
 $show_debug = isset($options['show_debug_info']) && $options['show_debug_info'] === 'yes' && current_user_can('manage_options');
 ?>
 
-<div class="redcap-portal-nav">
-    <ul>
-        <li><a href="/my-data?survey=consent_form">Consent form</a></li>
-        <li><a href="/my-data?survey=preenrollment_screening_questionnaire">Pre-Enrollment Questionnaire</a></li>
-    </ul>
-</div>
 <div class="redcap-portal-container">
     <div id="redcap-portal-content">
         <!-- Authentication check message will appear here if not logged in -->
     </div>
-    
+    <div class="redcap-portal-nav" style="display: none;">
+        <ul>
+            <li><a href="/my-data?survey=consent_form">Consent form</a></li>
+            <li><a href="/my-data?survey=preenrollment_screening_questionnaire">Pre-Enrollment Questionnaire</a></li>
+        </ul>
+    </div>
     <?php if ($show_profile): ?>
     <div id="redcap-patient-profile" class="redcap-portal-section" style="display: none;">
         <h2 class="redcap-section-title"><?php echo esc_html__('Your Profile', 'redcap-patient-portal'); ?></h2>
@@ -129,6 +128,8 @@ jQuery(document).ready(function($) {
             '<?php echo esc_js(__('Welcome to your secure health data portal.', 'redcap-patient-portal')); ?>' +
             '</div>'
         );
+
+        $('.redcap-portal-nav').show();
         
         <?php if ($show_profile): ?>
         $('#redcap-patient-profile').show();
