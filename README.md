@@ -298,6 +298,10 @@ For more detailed debugging:
 4. Regularly audit access logs
 5. Consider IP restrictions for the middleware server
 
+## ⚠️ WARNINGS ⚠️
+
+In your WordPress site configurations, Settings > General > Membership > "Anyone can register" checkbox should be set as False/Disabled otherwise users that are allowed to log into the site via this native signup process (without having any actual REDCap records, which is checked for by the **[redcap_registration redirect="/my-data"]** shortcode page) will be able to see the survey navigation menu in the portal page even though they themselves have no REDCap data (which could be considered a kind of data leak in that they get to know the names of the displayed REDCap surveys, while they themselves never actually filled out or possibly never were intended to recieve any such surveys).
+They will not see any data, as they have none on the REDCap server side to be matched with and displayed to their user account on the WordPress site, but they will see the survey names.
 
 ## ⚠️ IMPORTANT DISCLAIMER ⚠️
 
