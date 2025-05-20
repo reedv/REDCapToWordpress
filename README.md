@@ -209,7 +209,7 @@ add your study project's API token, along with other required settings:
 }
 ```
 
-The middleware server also expects to be able to access certain defined environment variables
+The middleware server also expects to be able to access certain defined environment variables (these should be stored in your cloud deployment's secrets manager and accessed as environment variabled when deploying the middleware docker container to a cloud platform)
 - `WORDPRESS_API_KEY` (api key that should only be known by plugin's `config.ini` file `middleman_api_key` config and the middleware server)
 - `REDCAP_API_TOKEN` (your redcap api token)
 - `JWT_SECRET` (a secure random strong that will be used to generate the JWT tokens)
