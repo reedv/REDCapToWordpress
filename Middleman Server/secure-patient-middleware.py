@@ -516,7 +516,7 @@ def get_patient_data(user_email):
 @app.route('/patient/surveys/<survey_name>', methods=['GET'])
 @token_required
 def get_survey_results(user_email, survey_name):
-    """Get specific survey results for the authenticated patient"""
+    """Get specific survey results for the authenticated patient using record-based access"""
     try:
         # Sanitize survey name to prevent injection
         survey_name = survey_name.strip()
@@ -524,41 +524,79 @@ def get_survey_results(user_email, survey_name):
         if survey_name not in ALLOWED_SURVEYS:
             return jsonify({'message': 'Access to this survey is not permitted or survey does not exist'}), 403
         
-        # Make a secure REDCap API call with filtering
-        data = {
+        # Step 1: Get the user's record_id by finding their email in the project
+        # This verifies the user exists and gets their record identifier
+        user_lookup_data = {
             'token': REDCAP_API_TOKEN,
             'content': 'record',
             'format': 'json',
             'type': 'flat',
-            'forms': survey_name,  # Only return data from this survey/form
-            'filterLogic': f"[email] = '{sanitize_for_redcap(user_email)}'",  # Only return this patient's records
+            'filterLogic': f"[email] = '{sanitize_for_redcap(user_email)}'",
+            'fields': 'record_id,email',  # Only get essential fields for lookup
             'returnFormat': 'json'
         }
         
-        redcap_response = requests.post(REDCAP_API_URL, data=data, verify=True)
+        logger.debug(f"Looking up record_id for user: {user_email}")
+        user_lookup_response = requests.post(REDCAP_API_URL, data=user_lookup_data, verify=True)
         
-        if redcap_response.status_code != 200:
-            app.logger.error(f"REDCap API error: {redcap_response.text}")
+        if user_lookup_response.status_code != 200:
+            logger.error(f"REDCap API error during user lookup: {user_lookup_response.text}")
+            return jsonify({'message': 'Error verifying user access'}), 500
+            
+        user_records = user_lookup_response.json()
+        
+        if not user_records:
+            logger.warning(f"No records found for user {user_email}")
+            return jsonify({'message': 'User not found in study records'}), 404
+        
+        # Extract record_id from the user lookup
+        record_id = user_records[0].get('record_id')
+        if not record_id:
+            logger.error(f"No record_id found for user {user_email}")
+            return jsonify({'message': 'User record ID not found'}), 500
+        
+        logger.info(f"Found record_id {record_id} for user {user_email}")
+        
+        # Step 2: Get the specific survey data using record_id (not email filtering)
+        # This allows access to surveys that don't contain email fields
+        survey_data = {
+            'token': REDCAP_API_TOKEN,
+            'content': 'record',
+            'format': 'json',
+            'type': 'flat',
+            'forms': survey_name,
+            'records': record_id,  # Use record_id instead of filterLogic
+            'returnFormat': 'json'
+        }
+        
+        logger.debug(f"Fetching survey {survey_name} data for record_id: {record_id}")
+        survey_response = requests.post(REDCAP_API_URL, data=survey_data, verify=True)
+        
+        if survey_response.status_code != 200:
+            logger.error(f"REDCap API error: {survey_response.text}")
             return jsonify({'message': 'Error fetching survey data from REDCap'}), 500
             
-        records = redcap_response.json()
+        records = survey_response.json()
         
-        # Secondary security check
-        records = [record for record in records if record.get('email') == user_email]
+        # No secondary email filtering needed since we used record_id filtering
+        # The user was already validated in step 1
         
         if not records:
+            logger.info(f"No {survey_name} survey data found for record_id {record_id}")
             return jsonify({'message': f'No {survey_name} survey data found'}), 404
             
+        logger.info(f"Successfully retrieved {len(records)} records for survey {survey_name}")
         return jsonify({'survey_data': records})
         
     except Exception as e:
-        app.logger.error(f"Error in get_survey_results: {str(e)}")
+        logger.error(f"Error in get_survey_results: {str(e)}")
+        logger.error(traceback.format_exc())
         return jsonify({'message': 'An unexpected error occurred'}), 500
-    
+
 @app.route('/patient/survey_metadata/<survey_name>', methods=['GET'])
 @token_required
 def get_survey_metadata(user_email, survey_name):
-    """Get comprehensive metadata for a specific survey"""
+    """Get comprehensive metadata for a specific survey - no user-specific filtering needed"""
     
     # Validate requested survey
     if survey_name not in ALLOWED_SURVEYS:
@@ -567,6 +605,28 @@ def get_survey_metadata(user_email, survey_name):
     try:
         # Sanitize survey name
         survey_name = survey_name.strip()
+        
+        # For metadata, we don't need user-specific filtering since it's just field definitions
+        # But we still verify the user has access by checking their existence in the project
+        user_verification_data = {
+            'token': REDCAP_API_TOKEN,
+            'content': 'record',
+            'format': 'json',
+            'type': 'flat',
+            'filterLogic': f"[email] = '{sanitize_for_redcap(user_email)}'",
+            'fields': 'record_id',  # Minimal field to verify existence
+            'returnFormat': 'json'
+        }
+        
+        verification_response = requests.post(REDCAP_API_URL, data=user_verification_data, verify=True)
+        
+        if verification_response.status_code != 200:
+            logger.error(f"REDCap API error (verification): {verification_response.text}")
+            return jsonify({'message': 'Error verifying user access'}), 500
+            
+        user_records = verification_response.json()
+        if not user_records:
+            return jsonify({'message': 'User not found in study records'}), 404
         
         # Get metadata (field definitions)
         metadata_data = {
@@ -618,62 +678,6 @@ def get_survey_metadata(user_email, survey_name):
         
         # Get file repository info if there are file upload fields
         fileFields = [field for field in metadata if field.get('field_type') == 'file']
-        fileRepository = None
-        
-        if fileFields:
-            # Create endpoint to retrieve files securely
-            @app.route('/patient/file/<record_id>/<field_name>', methods=['GET'])
-            @token_required
-            def get_file(user_email, record_id, field_name):
-
-                # Validate record_id format (assuming it's numeric)
-                if not record_id.isdigit():
-                    return jsonify({'message': 'Invalid record ID format'}), 400
-                
-                # Validate field_name format (only allow alphanumeric and underscores)
-                if not re.match(r'^[a-zA-Z0-9_]+$', field_name):
-                    return jsonify({'message': 'Invalid field name format'}), 400
-                
-                # Verify this user has access to this record
-                verification_data = {
-                    'token': REDCAP_API_TOKEN,
-                    'content': 'record',
-                    'format': 'json',
-                    'type': 'flat',
-                    'records[0]': record_id,
-                    'fields[0]': 'email',
-                    'returnFormat': 'json'
-                }
-                verification_response = requests.post(REDCAP_API_URL, data=verification_data, verify=True)
-                if verification_response.status_code != 200:
-                    return jsonify({'message': 'Error verifying record access'}), 500
-                    
-                records = verification_response.json()
-                
-                if not records or records[0].get('email') != user_email:
-                    return jsonify({'message': 'Access denied to this record'}), 403
-                
-                # Get file data
-                file_data = {
-                    'token': REDCAP_API_TOKEN,
-                    'content': 'file',
-                    'action': 'export',
-                    'record': record_id,
-                    'field': field_name,
-                    'returnFormat': 'json'
-                }
-                
-                file_response = requests.post(REDCAP_API_URL, data=file_data, verify=True)
-                
-                if file_response.status_code != 200:
-                    return jsonify({'message': 'Error retrieving file'}), 500
-                
-                # Create response with appropriate content type
-                response = make_response(file_response.content)
-                response.headers.set('Content-Type', file_response.headers.get('Content-Type', 'application/octet-stream'))
-                response.headers.set('Content-Disposition', file_response.headers.get('Content-Disposition', f'attachment; filename="{field_name}_file"'))
-                
-                return response
         
         return jsonify({
             'metadata': metadata,
@@ -684,6 +688,93 @@ def get_survey_metadata(user_email, survey_name):
         
     except Exception as e:
         logger.error(f"Error in get_survey_metadata: {str(e)}")
+        logger.error(traceback.format_exc())
+        return jsonify({'message': 'An unexpected error occurred'}), 500
+
+# Helper function to get user's record_id (can be reused across functions)
+def get_user_record_id(user_email):
+    """Get the record_id for a validated user"""
+    user_lookup_data = {
+        'token': REDCAP_API_TOKEN,
+        'content': 'record',
+        'format': 'json',
+        'type': 'flat',
+        'filterLogic': f"[email] = '{sanitize_for_redcap(user_email)}'",
+        'fields': 'record_id,email',
+        'returnFormat': 'json'
+    }
+    
+    response = requests.post(REDCAP_API_URL, data=user_lookup_data, verify=True)
+    
+    if response.status_code != 200:
+        logger.error(f"REDCap API error during record_id lookup: {response.text}")
+        return None
+        
+    records = response.json()
+    
+    if not records:
+        logger.warning(f"No records found for user {user_email}")
+        return None
+        
+    return records[0].get('record_id')
+    
+# File download endpoint
+@app.route('/patient/file/<record_id>/<field_name>', methods=['GET'])
+@token_required
+def get_file(user_email, record_id, field_name):
+    """Download files securely for authenticated patients"""
+    try:
+        # Validate record_id format (assuming it's numeric)
+        if not record_id.isdigit():
+            return jsonify({'message': 'Invalid record ID format'}), 400
+        
+        # Validate field_name format (only allow alphanumeric and underscores)
+        if not re.match(r'^[a-zA-Z0-9_]+$', field_name):
+            return jsonify({'message': 'Invalid field name format'}), 400
+        
+        # Verify this user has access to this record
+        verification_data = {
+            'token': REDCAP_API_TOKEN,
+            'content': 'record',
+            'format': 'json',
+            'type': 'flat',
+            'records[0]': record_id,
+            'fields[0]': 'email',
+            'returnFormat': 'json'
+        }
+        verification_response = requests.post(REDCAP_API_URL, data=verification_data, verify=True)
+        if verification_response.status_code != 200:
+            return jsonify({'message': 'Error verifying record access'}), 500
+            
+        records = verification_response.json()
+        
+        if not records or records[0].get('email') != user_email:
+            return jsonify({'message': 'Access denied to this record'}), 403
+        
+        # Get file data
+        file_data = {
+            'token': REDCAP_API_TOKEN,
+            'content': 'file',
+            'action': 'export',
+            'record': record_id,
+            'field': field_name,
+            'returnFormat': 'json'
+        }
+        
+        file_response = requests.post(REDCAP_API_URL, data=file_data, verify=True)
+        
+        if file_response.status_code != 200:
+            return jsonify({'message': 'Error retrieving file'}), 500
+        
+        # Create response with appropriate content type
+        response = make_response(file_response.content)
+        response.headers.set('Content-Type', file_response.headers.get('Content-Type', 'application/octet-stream'))
+        response.headers.set('Content-Disposition', file_response.headers.get('Content-Disposition', f'attachment; filename="{field_name}_file"'))
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error in get_file: {str(e)}")
         logger.error(traceback.format_exc())
         return jsonify({'message': 'An unexpected error occurred'}), 500
 
