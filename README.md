@@ -209,7 +209,7 @@ add your study project's API token, along with other required settings:
 }
 ```
 
-The middleware server also expects to be able to access certain defined environment variables
+The middleware server also expects to be able to access certain defined environment variables (these should be stored in your cloud deployment's secrets manager and accessed as environment variabled when deploying the middleware docker container to a cloud platform)
 - `WORDPRESS_API_KEY` (api key that should only be known by plugin's `config.ini` file `middleman_api_key` config and the middleware server)
 - `REDCAP_API_TOKEN` (your redcap api token)
 - `JWT_SECRET` (a secure random strong that will be used to generate the JWT tokens)
@@ -247,10 +247,16 @@ cd ./Middleman\ Server
 docker build -t wp2redcap_middleware
 docker run -p 8080:8080 wp2redcap_middleware
 ```
-... then some sanity testing to request and recieve something like...
+... then some quick basic testing to request and recieve something like...
 ```bash
-$ curl http://localhost:8080/auth/generate_token -X POST -H "Content-Type: application/json" -d '{"email":"test"}'
-{"message": "Invalid credentials"}
+$ curl -v -X POST https://your-middleware-url/auth/generate_token \
+  -H "Content-Type: application/json" \
+  -H "X-API-KEY: your-wp2middleware-private-api-key" \
+  -d '{"email":"test@example.com"}'
+.
+.
+.
+{"error_type":"user_not_found","message":"User email not found in records"}
 ```
 
 ## Security Model
