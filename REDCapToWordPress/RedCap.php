@@ -351,8 +351,10 @@ class REDCap_Patient_Portal {
         ));
         
         if (is_wp_error($response)) {
+            $error_message = $response->get_error_message();
+            error_log('Middleware connection error: ' . $error_message);
             wp_send_json_error(array(
-                'message' => 'Error contacting middleware server',
+                'message' => 'Error contacting middleware server: ' . $error_message,
                 'error' => 'server_connection'
             ));
             return;
@@ -440,8 +442,10 @@ class REDCap_Patient_Portal {
         ));
         
         if (is_wp_error($response)) {
+            $error_message = $response->get_error_message();
+            error_log('Middleware connection error: ' . $error_message);
             wp_send_json_error(array(
-                'message' => 'Error contacting middleware server',
+                'message' => 'Error contacting middleware server: ' . $error_message,
                 'error' => 'server_connection'
             ));
             return;
