@@ -2,7 +2,7 @@
 /**
  * Plugin Name: REDCap Patient Portal Connector
  * Description: Securely connects WordPress users to their REDCap data through a middleware service
- * Version: 1.0.0
+ * Version: 1.1.0
  * Author: Your Name
  * Text Domain: redcap-patient-portal
  */
@@ -13,7 +13,7 @@ if (!defined('WPINC')) {
 }
 
 // Define plugin constants
-define('REDCAP_PORTAL_VERSION', '1.0.0');
+define('REDCAP_PORTAL_VERSION', '1.1.0');
 define('REDCAP_PORTAL_PATH', plugin_dir_path(__FILE__));
 define('REDCAP_PORTAL_URL', plugin_dir_url(__FILE__));
 

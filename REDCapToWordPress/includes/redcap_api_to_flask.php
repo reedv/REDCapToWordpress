@@ -81,102 +81,6 @@ function verify_participant($email, $first_name, $last_name) {
     return $response;
 }
 
-// DEPRECIATED, see issue #32
-// function request_data($record_id){
-//     $middleware_url = get_middleware_config('middleware_url');
-
-//     $data = array(
-//     'record' => $record_id,
-//     );
-//     $ch = curl_init();
-//     curl_setopt($ch, CURLOPT_URL, $middleware_url . '/profile_load');
-//     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-//     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-//     curl_setopt($ch, CURLOPT_VERBOSE, 0);
-//     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-//     curl_setopt($ch, CURLOPT_AUTOREFERER, true);
-//     curl_setopt($ch, CURLOPT_MAXREDIRS, 10);
-//     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-//     curl_setopt($ch, CURLOPT_FRESH_CONNECT, 1);
-//     curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data, '', '&'));
-//     $output = curl_exec($ch);
-//     curl_close($ch);
-//     $data = json_decode($output, true);
-//     return $data;
-
-// }
-
-// DEPRECIATED, see issue #32
-// function generate_next_id(){
-//     $middleware_url = get_middleware_config('middleware_url');
-
-//     $ch = curl_init();
-//     curl_setopt($ch, CURLOPT_URL, $middleware_url . '/next_record_id');
-//     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-//     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-//     curl_setopt($ch, CURLOPT_VERBOSE, 0);
-//     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-//     curl_setopt($ch, CURLOPT_AUTOREFERER, true);
-//     curl_setopt($ch, CURLOPT_MAXREDIRS, 10);
-//     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
-//     curl_setopt($ch, CURLOPT_FRESH_CONNECT, 1);
-//     $output = curl_exec($ch);
-//     curl_close($ch);
-//     return $output;
-
-// }
-
-// DEPRECIATED, see issue #32
-// function check_record($record_id){
-//     $middleware_url = get_middleware_config('middleware_url');
-
-//     $data = array(
-//         'record' => $record_id,
-//     );
-//     $ch = curl_init();
-//     curl_setopt($ch, CURLOPT_URL, $middleware_url . '/check_record');
-//     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-//     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-//     curl_setopt($ch, CURLOPT_VERBOSE, 0);
-//     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-//     curl_setopt($ch, CURLOPT_AUTOREFERER, true);
-//     curl_setopt($ch, CURLOPT_MAXREDIRS, 10);
-//     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-//     curl_setopt($ch, CURLOPT_FRESH_CONNECT, 1);
-//     curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data, '', '&'));
-//     $output = curl_exec($ch);
-//     curl_close($ch);
-//     return $output;
-// }
-
-// DEPRECIATED, see issue #32
-// function create_record($record_id, $first_name, $last_name, $email){
-//     $middleware_url = get_middleware_config('middleware_url');
-
-//     $data = array(
-//     'record' => $record_id,
-//     'first name' => $first_name,
-//     'last name' => $last_name,
-//     'email' => $email
-//     );
-//     $ch = curl_init();
-//     curl_setopt($ch, CURLOPT_URL, $middleware_url . '/create_record');
-//     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-//     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-//     curl_setopt($ch, CURLOPT_VERBOSE, 0);
-//     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-//     curl_setopt($ch, CURLOPT_AUTOREFERER, true);
-//     curl_setopt($ch, CURLOPT_MAXREDIRS, 10);
-//     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-//     curl_setopt($ch, CURLOPT_FRESH_CONNECT, 1);
-//     curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data, '', '&'));
-//     $output = curl_exec($ch);
-//     curl_close($ch);
-//     $data = json_decode($output, true);
-//     return $data;
-
-// }
-
 function insert_data_redcap($email, $record_id){
 	global $wpdb;
 	$wpdb -> insert(
@@ -184,15 +88,6 @@ function insert_data_redcap($email, $record_id){
 	array(
 	'email' => $email,
 	'record_id' => $record_id,));
-}
-
-function register_to_redcap($email, $first_name, $last_name, $record_id){
-
-	if($record_id==''){
-		$record_id=generate_next_id();
-	}
-	create_record($record_id, $first_name, $last_name, $email);
-	insert_data_redcap($email, $record_id);
 }
 
 ?>
