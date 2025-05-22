@@ -304,6 +304,52 @@ For more detailed debugging:
 4. Regularly audit access logs
 5. Consider IP restrictions for the middleware server
 
+## Network Security Requirements
+
+### Cloud Platform Security Measures
+
+**CRITICAL**: This plugin and middleware server require additional network-level security measures that should be implemented through your cloud deployment platform. The application-level security built into this system is not sufficient for production deployments handling PHI.
+
+#### Required Network Security Controls
+
+Implement **at least one** of the following network security solutions:
+
+**For AWS Deployments:**
+- AWS Shield Advanced with AWS WAF for DDoS protection and application firewall
+- AWS Application Load Balancer with security groups restricting IP access
+- VPC configuration with private subnets and NAT gateways
+
+**For GCP Deployments:**
+- Google Cloud Armor for DDoS protection and web application firewall
+- Cloud Load Balancing with backend security policies
+- VPC firewall rules restricting access to authorized IP ranges
+
+**For Cloudflare et al Users:** (eg. if you're going to run your WP site and/or middleware server URL behind cloundflare et al)
+- Cloudflare's Web Application Firewall (WAF)
+- DDoS protection and rate limiting
+- IP Access Rules to restrict geographical or IP-based access
+
+#### Essential Security Controls
+
+Your deployment should include:
+
+1. **Rate Limiting**: Prevent brute force attacks on authentication endpoints
+2. **DDoS Protection**: Shield against volumetric attacks that could cause service disruption
+3. **Web Application Firewall**: Filter malicious HTTP/HTTPS requests before they reach your middleware
+4. **IP Allowlisting**: Restrict middleware access to your WordPress server's IP range
+5. **SSL/TLS Termination**: Handle certificate management at the load balancer/proxy level
+
+#### Architecture Rationale
+
+The middleware server handles sensitive authentication tokens and REDCap API communications. Because it operates as a standalone Flask application, it lacks the built-in security features that managed platforms provide. Network-level controls create essential defense-in-depth layers that:
+
+- Prevent attackers from directly accessing the middleware endpoints
+- Mitigate application-layer vulnerabilities through traffic filtering
+- Provide monitoring and alerting for suspicious access patterns
+- Handle certificate management and SSL/TLS encryption efficiently
+
+**Failure to implement these network security measures significantly increases your risk of data breach**
+
 ## ⚠️ WARNINGS ⚠️
 
 In your WordPress site configurations, Settings > General > Membership > "Anyone can register" checkbox should be set as False/Disabled otherwise users that are allowed to log into the site via this native signup process (without having any actual REDCap records, which is checked for by the **[redcap_registration redirect="/my-data"]** shortcode page) will be able to see the survey navigation menu in the portal page even though they themselves have no REDCap data (which could be considered a kind of data leak in that they get to know the names of the displayed REDCap surveys, while they themselves never actually filled out or possibly never were intended to recieve any such surveys).
