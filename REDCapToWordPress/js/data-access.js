@@ -214,8 +214,15 @@ class REDCapPatientData {
         return null;
     }
     
-    // Cookie will/should be sent automatically, so no need for direct token access
-    return `${this.fileEndpoint}/${recordId}/${fieldName}`;
+    // Use WordPress AJAX endpoint instead of direct call to middleware URL
+    const params = new URLSearchParams({
+        action: 'redcap_get_file_download',
+        record_id: recordId,
+        field_name: fieldName,
+        nonce: redcapPortal.nonce
+    });
+    
+    return `${redcapPortal.ajaxUrl}?${params.toString()}`;
   }
   
   /**

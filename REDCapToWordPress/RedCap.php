@@ -79,6 +79,9 @@ class REDCap_Patient_Portal {
         add_action('wp_ajax_redcap_get_survey_results', array($this, 'ajax_get_survey_results'));
         add_action('wp_ajax_redcap_get_patient_data', array($this, 'ajax_get_patient_data'));
 
+        // Add AJAX handler for file downloads
+        add_action('wp_ajax_redcap_get_file_download', array($this, 'ajax_get_file_download'));
+
     }
     
     /**
@@ -710,6 +713,97 @@ class REDCap_Patient_Portal {
         
         // Process the middleware response through the shared handler
         $this->handle_middleware_response($response);
+    }
+
+    /**
+     * AJAX handler to proxy file downloads from middleware
+     */
+    public function ajax_get_file_download() {
+        check_ajax_referer('redcap_portal_nonce', 'nonce');
+        
+        // Require authentication
+        if (!is_user_logged_in()) {
+            wp_send_json_error(array('message' => 'Not authenticated', 'error' => 'auth_required'));
+            return;
+        }
+        
+        $record_id = isset($_GET['record_id']) ? sanitize_text_field($_GET['record_id']) : '';
+        $field_name = isset($_GET['field_name']) ? sanitize_text_field($_GET['field_name']) : '';
+        
+        if (empty($record_id) || empty($field_name)) {
+            wp_send_json_error(array('message' => 'Missing required parameters', 'error' => 'invalid_request'));
+            return;
+        }
+        
+        // Validate record_id format (assuming numeric)
+        if (!preg_match('/^[a-zA-Z0-9_-]+$/', $record_id)) {
+            wp_send_json_error(array('message' => 'Invalid record ID format', 'error' => 'invalid_request'));
+            return;
+        }
+        
+        // Validate field_name format
+        if (!preg_match('/^[a-zA-Z0-9_]+$/', $field_name)) {
+            wp_send_json_error(array('message' => 'Invalid field name format', 'error' => 'invalid_request'));
+            return;
+        }
+        
+        // Check if token cookie exists
+        if (!isset($_COOKIE['redcap_token'])) {
+            wp_send_json_error(array('message' => 'Authentication required', 'error' => 'auth_required'));
+            return;
+        }
+        
+        // Capture client details for fingerprinting
+        $client_ip = $_SERVER['REMOTE_ADDR'];
+        $client_ua = $_SERVER['HTTP_USER_AGENT'];
+        
+        // Forward request to middleware with token from cookie
+        $response = wp_remote_get($this->middleware_url . '/patient/file/' . $record_id . '/' . $field_name, array(
+            'headers' => array(
+                'Authorization' => 'Bearer ' . $_COOKIE['redcap_token'],
+                'Content-Type' => 'application/json',
+                'X-Original-Client-IP' => $client_ip,
+                'X-Original-User-Agent' => $client_ua
+            ),
+            'timeout' => 30, // Longer timeout for file downloads
+            'sslverify' => true
+        ));
+        
+        if (is_wp_error($response)) {
+            wp_send_json_error(array(
+                'message' => 'Error contacting middleware server',
+                'error' => 'server_connection'
+            ));
+            return;
+        }
+        
+        $status_code = wp_remote_retrieve_response_code($response);
+        $body = wp_remote_retrieve_body($response);
+        
+        if ($status_code === 200) {
+            // Get content type and filename from middleware response
+            $content_type = wp_remote_retrieve_header($response, 'Content-Type') ?: 'application/octet-stream';
+            $content_disposition = wp_remote_retrieve_header($response, 'Content-Disposition');
+            
+            // Set appropriate headers for file download
+            header('Content-Type: ' . $content_type);
+            if ($content_disposition) {
+                header('Content-Disposition: ' . $content_disposition);
+            } else {
+                header('Content-Disposition: attachment; filename="' . $field_name . '_file"');
+            }
+            header('Content-Length: ' . strlen($body));
+            
+            // Output the file content
+            echo $body;
+            exit; // Important: prevent WordPress from adding any additional output
+        } else {
+            $error_data = json_decode($body, true);
+            wp_send_json_error(array(
+                'message' => $error_data['message'] ?? 'Error downloading file',
+                'error' => $error_data['error'] ?? 'download_error'
+            ));
+        }
     }
 
     /**
