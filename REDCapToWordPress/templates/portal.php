@@ -102,6 +102,51 @@ jQuery(document).ready(function($) {
     const redcapAuth = new REDCapAuth(redcapPortal.middlewareUrl);
     const redcapData = new REDCapPatientData(redcapAuth, redcapPortal.middlewareUrl);
 
+    // Extract logged-out state display logic for reuse
+    function showPortalLoggedOutState(reason = 'logged_out') {
+        // Hide all portal sections
+        $('.redcap-portal-nav').hide();
+        <?php if ($show_profile): ?>
+        $('#redcap-patient-profile').hide();
+        <?php endif; ?>
+        <?php if (!empty($survey)): ?>
+        $('#redcap-survey-results').hide();
+        <?php endif; ?>
+        $('#redcap-all-data').hide();
+        $('#redcap-portal-actions').hide();
+        
+        // Determine appropriate message based on reason
+        let message, submessage;
+        switch(reason) {
+            case 'logged_out':
+                message = '<?php echo esc_js(__('You have been logged out of the health data portal.', 'redcap-patient-portal')); ?>';
+                submessage = '<?php echo esc_js(__('Portal session ended.', 'redcap-patient-portal')); ?>';
+                break;
+            case 'expired':
+                message = '<?php echo esc_js(__('Your portal session has expired.', 'redcap-patient-portal')); ?>';
+                submessage = '<?php echo esc_js(__('Please log in again to access your health data.', 'redcap-patient-portal')); ?>';
+                break;
+            default:
+                message = '<?php echo esc_js(__('Portal authentication required.', 'redcap-patient-portal')); ?>';
+                submessage = '<?php echo esc_js(__('Please log in to access your health data.', 'redcap-patient-portal')); ?>';
+        }
+        
+        // Show logged-out message with login option
+        $('#redcap-portal-content').html(
+            '<div class="redcap-message">' + message + '</div>' +
+            '<div class="redcap-error-message">' + submessage + '</div>' +
+            '<p><a href="<?php echo esc_js(site_url('/login')); ?>" class="redcap-button redcap-primary-button">' +
+            '<?php echo esc_js(__('Access Health Data Portal', 'redcap-patient-portal')); ?>' +
+            '</a></p>' +
+            '<div style="margin-top: 15px; padding: 10px; background-color: #f0f8ff; border-left: 4px solid #2271b1; font-size: 14px;">' +
+            '<strong><?php echo esc_js(__('Note:', 'redcap-patient-portal')); ?></strong> ' +
+            '<?php echo esc_js(__('You remain logged into the main website and can access other areas.', 'redcap-patient-portal')); ?>' +
+            '</div>'
+        );
+        
+        debugLog('Portal logged out state displayed (reason: ' + reason + ')');
+    }
+
     // Check authentication and initialize the page
     (async function initializePortal() {
         // Verify token with the server rather than relying on client-side check
@@ -704,8 +749,21 @@ jQuery(document).ready(function($) {
     
     // Logout button
     $('#redcap-logout-button').on('click', async function() {
-        await redcapAuth.logout();
-        window.location.href = '<?php echo esc_js(site_url('/login')); ?>';
+        debugLog('User initiated portal logout');
+        
+        try {
+            // Clear REDCap middleware tokens
+            await redcapAuth.logout();
+            debugLog('REDCap tokens cleared successfully');
+        } catch (error) {
+            debugLog('REDCap token clearing failed: ' + error.message);
+            // Continue with logout process even if token clearing fails
+        }
+        
+        // Show logged-out state without redirecting (preserves WordPress session)
+        showPortalLoggedOutState('logged_out');
+        
+        debugLog('Portal logout complete - WordPress session maintained');
     });
 });
 </script>
