@@ -222,6 +222,45 @@ class REDCap_Patient_Portal {
             ));
             return;
         }
+
+        // Validate email format (defense in depth beyond sanitize_email)
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 254) {
+            wp_send_json_error(array(
+                'message' => __('Please enter a valid email address.', 'redcap-patient-portal')
+            ));
+            return;
+        }
+        
+        // Validate name fields - only letters, spaces, hyphens, apostrophes
+        if (!preg_match('/^[a-zA-Z\s\-\']{1,50}$/', $first_name) || 
+            !preg_match('/^[a-zA-Z\s\-\']{1,50}$/', $last_name)) {
+            wp_send_json_error(array(
+                'message' => __('Names can only contain letters, spaces, hyphens, and apostrophes (max 50 characters).', 'redcap-patient-portal')
+            ));
+            return;
+        }
+        
+        // Username additional validation (WordPress sanitize_user is permissive)
+        if (strlen($username) < 3 || strlen($username) > 20 || 
+            !preg_match('/^[a-zA-Z0-9._-]+$/', $username)) {
+            wp_send_json_error(array(
+                'message' => __('Username must be 3-20 characters and contain only letters, numbers, periods, underscores, and hyphens.', 'redcap-patient-portal')
+            ));
+            return;
+        }
+        
+        // Validate redirect URL is internal to prevent open redirects
+        if (!empty($redirect_url)) {
+            $parsed_url = parse_url($redirect_url);
+            $site_url = parse_url(home_url());
+            
+            if (isset($parsed_url['host']) && $parsed_url['host'] !== $site_url['host']) {
+                wp_send_json_error(array(
+                    'message' => __('Invalid redirect URL.', 'redcap-patient-portal')
+                ));
+                return;
+            }
+        }
         
         // Include the middleware client function
         require_once(REDCAP_PORTAL_PATH . 'includes/redcap_api_to_flask.php');
