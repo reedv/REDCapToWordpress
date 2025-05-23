@@ -209,7 +209,7 @@ class REDCapPatientData {
   }
 
   // Helper method to download files
-  // File download disabled for security reasons, see issue #49
+  // File download disabled for security reasons, see issue #50
 //   getFileDownloadUrl(recordId, fieldName) {
 //     if (!this.auth.isAuthenticated()) {
 //         return null;
