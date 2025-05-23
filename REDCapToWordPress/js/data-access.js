@@ -209,21 +209,22 @@ class REDCapPatientData {
   }
 
   // Helper method to download files
-  getFileDownloadUrl(recordId, fieldName) {
-    if (!this.auth.isAuthenticated()) {
-        return null;
-    }
+  // File download disabled for security reasons, see issue #49
+//   getFileDownloadUrl(recordId, fieldName) {
+//     if (!this.auth.isAuthenticated()) {
+//         return null;
+//     }
     
-    // Use WordPress AJAX endpoint instead of direct call to middleware URL
-    const params = new URLSearchParams({
-        action: 'redcap_get_file_download',
-        record_id: recordId,
-        field_name: fieldName,
-        nonce: redcapPortal.nonce
-    });
+//     // Use WordPress AJAX endpoint instead of direct call to middleware URL
+//     const params = new URLSearchParams({
+//         action: 'redcap_get_file_download',
+//         record_id: recordId,
+//         field_name: fieldName,
+//         nonce: redcapPortal.nonce
+//     });
     
-    return `${redcapPortal.ajaxUrl}?${params.toString()}`;
-  }
+//     return `${redcapPortal.ajaxUrl}?${params.toString()}`;
+//   }
   
   /**
    * Render patient data to a DOM element

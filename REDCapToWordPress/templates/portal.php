@@ -428,12 +428,16 @@ jQuery(document).ready(function($) {
                                     break;
                                     
                                 case 'file':
-                                    // Create download link for files
-                                    const fileUrl = redcapData.getFileDownloadUrl(record.record_id, fieldName);
-                                    fieldValue = record[fieldName] ? 
-                                        `<a href="${fileUrl}" class="redcap-file-download" target="_blank">
-                                            <i class="fas fa-download"></i> Download File
-                                        </a>` : 'No file uploaded';
+                                    // Display file information without download capability
+                                    if (record[fieldName]) {
+                                        fieldValue = `<div class="redcap-file-info">
+                                            <i class="fas fa-file"></i> 
+                                            <span class="redcap-file-name">File: ${record[fieldName]}</span>
+                                            <div class="redcap-file-note">File downloads are disabled for security reasons. Contact study coordinator for file access.</div>
+                                        </div>`;
+                                    } else {
+                                        fieldValue = '<span class="redcap-no-file">No file uploaded</span>';
+                                    }
                                     break;
                                     
                                 case 'calc':

@@ -371,6 +371,39 @@
     text-decoration: none;
 }
 
+/* File information display (no download) */
+.redcap-file-info {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 12px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.redcap-file-name {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 4px;
+}
+
+.redcap-file-note {
+    font-size: 12px;
+    color: #6c757d;
+    font-style: italic;
+}
+
+.redcap-no-file {
+    color: #6c757d;
+    font-style: italic;
+}
+
+.redcap-file-info i {
+    color: #6c757d;
+    margin-right: 6px;
+}
+
 /* ====== Record Details ====== */
 .redcap-record-details {
     margin-top: 20px;
