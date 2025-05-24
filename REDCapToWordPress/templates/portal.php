@@ -102,6 +102,19 @@ jQuery(document).ready(function($) {
     const redcapAuth = new REDCapAuth(redcapPortal.middlewareUrl);
     const redcapData = new REDCapPatientData(redcapAuth, redcapPortal.middlewareUrl);
 
+    function escapeHtml(str) {
+        if (str === null || str === undefined) {
+            return '';
+        }
+        
+        return String(str)
+            .replace(/&/g, '&amp;')   // Must be first to avoid double-escaping
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#x27;');
+    }
+
     // Extract logged-out state display logic for reuse
     function showPortalLoggedOutState(reason = 'logged_out') {
         // Hide all portal sections
@@ -202,14 +215,14 @@ jQuery(document).ready(function($) {
                 // Add name if available
                 if (profileData.name_first || profileData.name_last) {
                     profileHtml += '<div class="redcap-profile-name">' + 
-                        (profileData.name_first || '') + ' ' + (profileData.name_last || '') + 
+                        escapeHtml(profileData.name_first || '') + ' ' + escapeHtml(profileData.name_last || '') + 
                         '</div>';
                 }
                 
                 // Add email
                 if (profileData.email) {
                     profileHtml += '<div class="redcap-profile-field"><strong><?php echo esc_js(__('Email:', 'redcap-patient-portal')); ?></strong> ' + 
-                        profileData.email + '</div>';
+                        escapeHtml(profileData.email) + '</div>';
                 }
                 
                 // Add other basic fields
@@ -218,7 +231,7 @@ jQuery(document).ready(function($) {
                     if (profileData[field]) {
                         profileHtml += '<div class="redcap-profile-field"><strong>' + 
                             field.charAt(0).toUpperCase() + field.slice(1) + ':</strong> ' + 
-                            profileData[field] + '</div>';
+                            escapeHtml(profileData[field]) + '</div>';
                     }
                 });
                 
@@ -368,7 +381,8 @@ jQuery(document).ready(function($) {
                             
                             // Get field information
                             const questionText = field.field_label || fieldName;
-                            let fieldValue = record[fieldName];
+                            let rawFieldValue = record[fieldName];
+                            let fieldValue = escapeHtml(rawFieldValue);
                             let fieldNote = field.field_note ? `<div class="redcap-field-note">${field.field_note}</div>` : '';
                             
                             // null/undefined handling
@@ -428,11 +442,11 @@ jQuery(document).ready(function($) {
                                     break;
                                     
                                 case 'file':
-                                    // Display file information without download capability
-                                    if (record[fieldName]) {
+                                    if (rawFieldValue) {
+                                        // Construct HTML with escaped filename only
                                         fieldValue = `<div class="redcap-file-info">
                                             <i class="fas fa-file"></i> 
-                                            <span class="redcap-file-name">File: ${record[fieldName]}</span>
+                                            <span class="redcap-file-name">File: ${escapeHtml(rawFieldValue)}</span>
                                             <div class="redcap-file-note">File downloads are disabled for security reasons. Contact study coordinator for file access.</div>
                                         </div>`;
                                     } else {
@@ -554,7 +568,8 @@ jQuery(document).ready(function($) {
                                 const cell = rowData.fields.find(field => field.field_label.includes(header));
                                 
                                 if (cell) {
-                                    let cellValue = record[cell.field_name] || '';
+                                    let rawCellValue = record[cell.field_name] || '';
+                                    let cellValue = escapeHtml(rawCellValue);
                                     
                                     // Process value based on field type (similar to above but simplified)
                                     if (cell.field_type === 'radio' && cell.select_choices_or_calculations) {
