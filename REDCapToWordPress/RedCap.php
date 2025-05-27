@@ -84,6 +84,74 @@ class REDCap_Patient_Portal {
         // add_action('wp_ajax_redcap_get_file_download', array($this, 'ajax_get_file_download'));
 
     }
+
+    /**
+     * Diagnostic function to log all available IP headers
+     */
+    private function log_ip_diagnostics($context = '') {
+        $ip_headers = [
+            'REMOTE_ADDR' => $_SERVER['REMOTE_ADDR'] ?? 'not set',
+            'HTTP_CF_CONNECTING_IP' => $_SERVER['HTTP_CF_CONNECTING_IP'] ?? 'not set',
+            'HTTP_X_FORWARDED_FOR' => $_SERVER['HTTP_X_FORWARDED_FOR'] ?? 'not set',
+            'HTTP_X_REAL_IP' => $_SERVER['HTTP_X_REAL_IP'] ?? 'not set',
+            'HTTP_CLIENT_IP' => $_SERVER['HTTP_CLIENT_IP'] ?? 'not set',
+            'HTTP_X_FORWARDED' => $_SERVER['HTTP_X_FORWARDED'] ?? 'not set',
+            'HTTP_FORWARDED_FOR' => $_SERVER['HTTP_FORWARDED_FOR'] ?? 'not set',
+            'HTTP_FORWARDED' => $_SERVER['HTTP_FORWARDED'] ?? 'not set'
+        ];
+        
+        error_log("REDCap Portal IP Diagnostics - Context: $context");
+        foreach ($ip_headers as $header => $value) {
+            error_log("  $header: $value");
+        }
+        error_log("  User-Agent: " . ($_SERVER['HTTP_USER_AGENT'] ?? 'not set'));
+        error_log("---");
+    }
+
+    /**
+     * Get the real client IP address, accounting for Cloudflare proxy
+     * 
+     * @return string The real client IP address
+     */
+    private function get_real_client_ip() {
+        // Cloudflare always provides the original client IP in this header
+        if (!empty($_SERVER['HTTP_CF_CONNECTING_IP'])) {
+            // Validate it's a valid IP address
+            $cf_ip = $_SERVER['HTTP_CF_CONNECTING_IP'];
+            if (filter_var($cf_ip, FILTER_VALIDATE_IP)) {
+                return $cf_ip;
+            }
+        }
+        
+        // Fallback to REMOTE_ADDR if CF header missing (should not happen with Cloudflare)
+        return $_SERVER['REMOTE_ADDR'];
+    }
+
+    /**
+     * Handle middleware response consistently
+     */
+    private function handle_middleware_response($response) {
+        if (is_wp_error($response)) {
+            wp_send_json_error(array(
+                'message' => 'Error contacting middleware server',
+                'error' => 'server_connection'
+            ));
+            return;
+        }
+        
+        $status_code = wp_remote_retrieve_response_code($response);
+        $body = wp_remote_retrieve_body($response);
+        
+        if ($status_code === 200) {
+            wp_send_json_success(json_decode($body, true));
+        } else {
+            $error_data = json_decode($body, true);
+            wp_send_json_error(array(
+                'message' => $error_data['message'] ?? 'Error accessing data',
+                'error' => $error_data['error'] ?? 'api_error'
+            ));
+        }
+    }
     
     /**
      * Load plugin settings
@@ -187,6 +255,8 @@ class REDCap_Patient_Portal {
      */
     public function ajax_verify_and_register() {
         check_ajax_referer('redcap_participant_registration_nonce', 'nonce');
+
+        $this->log_ip_diagnostics('verify_and_register');
         
         // Validate input fields
         $email = isset($_POST['email']) ? sanitize_email($_POST['email']) : '';
@@ -332,6 +402,8 @@ class REDCap_Patient_Portal {
      */
     public function ajax_verify_wp_session() {
         check_ajax_referer('redcap_verify_wp_session', 'nonce');
+
+        $this->log_ip_diagnostics('verify_wp_session');
     
         // Check if user is logged in
         if (!is_user_logged_in()) {
@@ -378,7 +450,7 @@ class REDCap_Patient_Portal {
         }
         
         // Capture client details for fingerprinting
-        $client_ip = $_SERVER['REMOTE_ADDR'];
+        $client_ip = $this->get_real_client_ip();
         $client_ua = $_SERVER['HTTP_USER_AGENT'];
         
         // Generate token via middleware
@@ -461,6 +533,8 @@ class REDCap_Patient_Portal {
      */
     public function ajax_verify_token_with_fingerprint() {
         check_ajax_referer('redcap_portal_nonce', 'nonce');
+
+        $this->log_ip_diagnostics('verify_token_with_fingerprint');
         
         $token = isset($_POST['token']) ? sanitize_text_field($_POST['token']) : '';
         
@@ -470,7 +544,7 @@ class REDCap_Patient_Portal {
         }
         
         // Capture client details for fingerprinting (same as in token generation)
-        $client_ip = $_SERVER['REMOTE_ADDR'];
+        $client_ip = $this->get_real_client_ip();
         $client_ua = $_SERVER['HTTP_USER_AGENT'];
         
         // Verify token with middleware
@@ -517,6 +591,8 @@ class REDCap_Patient_Portal {
      */
     public function ajax_check_token_cookie() {
         check_ajax_referer('redcap_portal_nonce', 'nonce');
+
+        $this->log_ip_diagnostics('check_token_cookie');
         
         // Check if token cookie exists
         if (!isset($_COOKIE['redcap_token']) || !isset($_COOKIE['redcap_token_expiry'])) {
@@ -540,6 +616,9 @@ class REDCap_Patient_Portal {
      */
     public function ajax_clear_token_cookie() {
         check_ajax_referer('redcap_portal_nonce', 'nonce');
+
+        $this->log_ip_diagnostics('clear_token_cookie');
+        
         
         $cookie_domain = parse_url(home_url(), PHP_URL_HOST);
         $cookie_path = '/';
@@ -568,36 +647,12 @@ class REDCap_Patient_Portal {
     }
 
     /**
-     * Handle middleware response consistently
-     */
-    private function handle_middleware_response($response) {
-        if (is_wp_error($response)) {
-            wp_send_json_error(array(
-                'message' => 'Error contacting middleware server',
-                'error' => 'server_connection'
-            ));
-            return;
-        }
-        
-        $status_code = wp_remote_retrieve_response_code($response);
-        $body = wp_remote_retrieve_body($response);
-        
-        if ($status_code === 200) {
-            wp_send_json_success(json_decode($body, true));
-        } else {
-            $error_data = json_decode($body, true);
-            wp_send_json_error(array(
-                'message' => $error_data['message'] ?? 'Error accessing data',
-                'error' => $error_data['error'] ?? 'api_error'
-            ));
-        }
-    }
-
-    /**
      * AJAX handler to get survey metadata
      */
     public function ajax_get_survey_metadata() {
         check_ajax_referer('redcap_portal_nonce', 'nonce');
+
+        $this->log_ip_diagnostics('get_survey_metadata');
         
         // Require authentication
         if (!is_user_logged_in()) {
@@ -619,7 +674,7 @@ class REDCap_Patient_Portal {
         }
         
         // Capture client details for fingerprinting
-        $client_ip = $_SERVER['REMOTE_ADDR'];
+        $client_ip = $this->get_real_client_ip();
         $client_ua = $_SERVER['HTTP_USER_AGENT'];
         
         // Forward request to middleware with token from cookie
@@ -641,6 +696,9 @@ class REDCap_Patient_Portal {
      */
     public function ajax_get_survey_results() {
         check_ajax_referer('redcap_portal_nonce', 'nonce');
+
+        $this->log_ip_diagnostics('get_survey_results');
+        
         
         // Require authentication
         if (!is_user_logged_in()) {
@@ -662,7 +720,7 @@ class REDCap_Patient_Portal {
         }
         
         // Capture client details for fingerprinting
-        $client_ip = $_SERVER['REMOTE_ADDR'];
+        $client_ip = $this->get_real_client_ip();
         $client_ua = $_SERVER['HTTP_USER_AGENT'];
         
         // Forward request to middleware with token from cookie
@@ -684,6 +742,9 @@ class REDCap_Patient_Portal {
      */
     public function ajax_get_patient_data() {
         check_ajax_referer('redcap_portal_nonce', 'nonce');
+
+        $this->log_ip_diagnostics('get_patient_data');
+        
         
         // Verify user authentication status within WordPress
         if (!is_user_logged_in()) {
@@ -698,7 +759,7 @@ class REDCap_Patient_Portal {
         }
         
         // Capture original client context for fingerprint verification
-        $client_ip = $_SERVER['REMOTE_ADDR'];
+        $client_ip = $this->get_real_client_ip();
         $client_ua = $_SERVER['HTTP_USER_AGENT'];
         
         // Forward request to middleware with preserved client context
@@ -756,7 +817,7 @@ class REDCap_Patient_Portal {
     //     }
         
     //     // Capture client details for fingerprinting
-    //     $client_ip = $_SERVER['REMOTE_ADDR'];
+    //     $client_ip = $this->get_real_client_ip();
     //     $client_ua = $_SERVER['HTTP_USER_AGENT'];
         
     //     // Forward request to middleware with token from cookie
