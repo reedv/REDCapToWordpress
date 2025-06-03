@@ -115,22 +115,12 @@ For a more integrated experience, you can use a single page with URL parameters:
    - `/my-data?survey=medication_survey`
    - `/my-data?survey=follow_up_survey`
 
-##### Option 3: Tab-based Navigation
+##### Tab-based Navigation
 
-For a more interactive interface, you can add a tab navigation system:
+For a more interactive interface, the portal displays a tab navigation system:
 
 1. Create a single page with the shortcode: `[redcap_portal]`
-2. Add this HTML before the shortcode:
-   ```html
-   <div class="redcap-portal-nav">
-       <ul>
-           <li><a href="?survey=demographics">Demographics</a></li>
-           <li><a href="?survey=medication_survey">Medications</a></li>
-           <li><a href="?survey=follow_up_survey">Follow-ups</a></li>
-       </ul>
-   </div>
-   ```
-3. Add custom CSS to style the navigation tabs
+2. Add survey names to the plugin settings in your WordPress admin UI under the **Allowed Surveys** configuration for the plugin. Be sure that these surveys also match the `allowed_surveys` listed in the middleware's `config.json` file.
 
 #### Adding New Surveys to the Portal
 
