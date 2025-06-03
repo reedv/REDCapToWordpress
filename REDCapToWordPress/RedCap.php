@@ -646,6 +646,20 @@ class REDCap_Patient_Portal {
         wp_send_json_success(array('message' => 'Logged out successfully'));
     }
 
+    private function get_allowed_survey_names() {
+        $options = get_option('redcap_portal_settings');
+        $allowed_surveys = array();
+        
+        if (isset($options['allowed_surveys']) && !empty($options['allowed_surveys'])) {
+            $decoded = json_decode($options['allowed_surveys'], true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $allowed_surveys = array_column($decoded, 'name');
+            }
+        }
+        
+        return $allowed_surveys;
+    }
+
     /**
      * AJAX handler to get survey metadata
      */
@@ -664,6 +678,16 @@ class REDCap_Patient_Portal {
         
         if (empty($survey_name)) {
             wp_send_json_error(array('message' => 'Missing required parameters', 'error' => 'invalid_request'));
+            return;
+        }
+
+        // Validate against allowed surveys
+        $allowed_surveys = $this->get_allowed_survey_names();
+        if (!in_array($survey_name, $allowed_surveys, true)) {
+            wp_send_json_error(array(
+                'message' => 'Access to this survey is not permitted',
+                'error' => 'forbidden_survey'
+            ));
             return;
         }
         
@@ -710,6 +734,16 @@ class REDCap_Patient_Portal {
         
         if (empty($survey_name)) {
             wp_send_json_error(array('message' => 'Missing required parameters', 'error' => 'invalid_request'));
+            return;
+        }
+        
+        // Validate against allowed surveys
+        $allowed_surveys = $this->get_allowed_survey_names();
+        if (!in_array($survey_name, $allowed_surveys, true)) {
+            wp_send_json_error(array(
+                'message' => 'Access to this survey is not permitted',
+                'error' => 'forbidden_survey'
+            ));
             return;
         }
         
@@ -899,7 +933,7 @@ class REDCap_Patient_Portal {
     
     /**
      * Portal shortcode to display patient data
-     * Usage: [redcap_portal survey="medication_survey"]
+     * Usage: [redcap_portal survey="selected_survey_name"]
      */
     public function portal_shortcode($atts) {
         $atts = shortcode_atts(array(
@@ -907,10 +941,35 @@ class REDCap_Patient_Portal {
             'show_profile' => 'yes',
         ), $atts, 'redcap_portal');
         
-        // Check for URL parameter override
-        if (isset($_GET['survey']) && !empty($_GET['survey'])) {
-            $atts['survey'] = sanitize_text_field($_GET['survey']);
+        // Get allowed surveys from settings
+        $options = get_option('redcap_portal_settings');
+        $allowed_surveys = array();
+        
+        if (isset($options['allowed_surveys']) && !empty($options['allowed_surveys'])) {
+            $decoded = json_decode($options['allowed_surveys'], true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $allowed_surveys = $decoded;
+            }
         }
+        
+        // Extract survey names for validation
+        $allowed_survey_names = array_column($allowed_surveys, 'name');
+        
+        // Check for survey parameter in URL
+        if (isset($_GET['survey']) && !empty($_GET['survey'])) {
+            $requested_survey = sanitize_text_field($_GET['survey']);
+            
+            // Validate against allowed list
+            if (in_array($requested_survey, $allowed_survey_names, true)) {
+                $atts['survey'] = $requested_survey;
+            } else {
+                $atts['survey'] = '';
+                $atts['invalid_survey'] = true;
+            }
+        }
+        
+        // Pass configuration to template
+        $atts['allowed_surveys'] = $allowed_surveys;
         
         ob_start();
         include(REDCAP_PORTAL_PATH . 'templates/portal.php');
@@ -929,18 +988,81 @@ class REDCap_Patient_Portal {
             array($this, 'settings_page')
         );
     }
+
+    public function validate_portal_settings($input) {
+        $valid = array();
+        
+        // Validate middleware URL
+        if (isset($input['middleware_url'])) {
+            $valid['middleware_url'] = esc_url_raw($input['middleware_url']);
+        }
+        
+        // Validate middleware API key
+        if (isset($input['middleware_api_key'])) {
+            $valid['middleware_api_key'] = sanitize_text_field($input['middleware_api_key']);
+        }
+        
+        // Validate allowed surveys JSON
+        if (isset($input['allowed_surveys'])) {
+            $surveys = json_decode($input['allowed_surveys'], true);
+            
+            if (json_last_error() === JSON_ERROR_NONE && is_array($surveys)) {
+                // Validate each survey entry
+                $clean_surveys = array();
+                foreach ($surveys as $survey) {
+                    if (isset($survey['name']) && !empty($survey['name'])) {
+                        // CORRECTED SYNTAX HERE
+                        $clean_surveys[] = array(
+                            'name' => sanitize_text_field($survey['name']),
+                            'label' => sanitize_text_field($survey['label'] ?? '')
+                        );
+                    }
+                }
+                $valid['allowed_surveys'] = json_encode($clean_surveys);
+            } else {
+                add_settings_error(
+                    'redcap_portal_settings',
+                    'invalid_surveys_json',
+                    'Invalid survey configuration. Please check your entries.',
+                    'error'
+                );
+                // Keep the old value on error
+                $current = get_option('redcap_portal_settings');
+                $valid['allowed_surveys'] = $current['allowed_surveys'] ?? '[]';
+            }
+        }
+        
+        // Preserve other settings
+        if (isset($input['show_debug_info'])) {
+            $valid['show_debug_info'] = $input['show_debug_info'];
+        }
+        
+        return $valid;
+    }
     
     /**
      * Register settings
      */
     public function register_settings() {
-        register_setting('redcap_portal_settings_group', 'redcap_portal_settings');
+        register_setting(
+            'redcap_portal_settings_group', 
+            'redcap_portal_settings',
+            array($this, 'validate_portal_settings')  // validation callback
+        );
         
         add_settings_section(
             'redcap_portal_main_section',
             'Connection Settings',
             array($this, 'settings_section_callback'),
             'redcap-patient-portal'
+        );
+
+        add_settings_field(
+            'allowed_surveys',
+            'Allowed Surveys',
+            array($this, 'allowed_surveys_render'),
+            'redcap-patient-portal',
+            'redcap_portal_main_section'
         );
         
         add_settings_field(
@@ -973,6 +1095,146 @@ class REDCap_Patient_Portal {
      */
     public function settings_section_callback() {
         echo '<p>Configure the connection to your REDCap middleware server.</p>';
+    }
+
+    /**
+     * Allowed surveys setting field
+     */
+    public function allowed_surveys_render() {
+        $options = get_option('redcap_portal_settings');
+        $surveys_json = isset($options['allowed_surveys']) ? $options['allowed_surveys'] : '[]';
+        
+        // Attempt to parse existing JSON for display
+        $surveys = json_decode($surveys_json, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            $surveys = array();
+        }
+        ?>
+        <div id="allowed-surveys-container">
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th>Survey Name (REDCap form name)</th>
+                        <th>Display Label</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="allowed-surveys-list">
+                    <?php if (empty($surveys)): ?>
+                    <tr class="no-surveys">
+                        <td colspan="3">No surveys configured. Add your first survey below.</td>
+                    </tr>
+                    <?php else: ?>
+                        <?php foreach ($surveys as $index => $survey): ?>
+                        <tr>
+                            <td><?php echo esc_html($survey['name'] ?? ''); ?></td>
+                            <td><?php echo esc_html($survey['label'] ?? ''); ?></td>
+                            <td><button type="button" class="button remove-survey" data-index="<?php echo $index; ?>">Remove</button></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+            
+            <h4>Add New Survey</h4>
+            <table class="form-table">
+                <tr>
+                    <th><label for="new-survey-name">Survey Name</label></th>
+                    <td>
+                        <input type="text" id="new-survey-name" class="regular-text" />
+                        <p class="description">Enter the exact REDCap form/survey name (e.g., consent_form)</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th><label for="new-survey-label">Display Label</label></th>
+                    <td>
+                        <input type="text" id="new-survey-label" class="regular-text" />
+                        <p class="description">User-friendly name to display (e.g., Consent Form)</p>
+                    </td>
+                </tr>
+            </table>
+            <button type="button" id="add-survey-button" class="button button-primary">Add Survey</button>
+            
+            <!-- Hidden field to store JSON -->
+            <input type="hidden" name="redcap_portal_settings[allowed_surveys]" id="allowed-surveys-json" value="<?php echo esc_attr($surveys_json); ?>" />
+        </div>
+        
+        <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            let surveys = <?php echo json_encode($surveys); ?>;
+            
+            function updateSurveysDisplay() {
+                const tbody = $('#allowed-surveys-list');
+                tbody.empty();
+                
+                if (surveys.length === 0) {
+                    tbody.append('<tr class="no-surveys"><td colspan="3">No surveys configured. Add your first survey below.</td></tr>');
+                } else {
+                    surveys.forEach((survey, index) => {
+                        tbody.append(`
+                            <tr>
+                                <td>${escapeHtml(survey.name)}</td>
+                                <td>${escapeHtml(survey.label)}</td>
+                                <td><button type="button" class="button remove-survey" data-index="${index}">Remove</button></td>
+                            </tr>
+                        `);
+                    });
+                }
+                
+                // Update hidden JSON field
+                $('#allowed-surveys-json').val(JSON.stringify(surveys));
+            }
+            
+            function escapeHtml(text) {
+                const map = {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                };
+                return text.replace(/[&<>"']/g, m => map[m]);
+            }
+            
+            $('#add-survey-button').on('click', function() {
+                const name = $('#new-survey-name').val().trim();
+                const label = $('#new-survey-label').val().trim();
+                
+                if (!name) {
+                    alert('Survey name is required');
+                    return;
+                }
+                
+                // Check for duplicates
+                if (surveys.some(s => s.name === name)) {
+                    alert('This survey has already been added');
+                    return;
+                }
+                
+                surveys.push({
+                    name: name,
+                    label: label || name
+                });
+                
+                // Clear inputs
+                $('#new-survey-name').val('');
+                $('#new-survey-label').val('');
+                
+                updateSurveysDisplay();
+            });
+            
+            $(document).on('click', '.remove-survey', function() {
+                const index = $(this).data('index');
+                surveys.splice(index, 1);
+                updateSurveysDisplay();
+            });
+        });
+        </script>
+        
+        <p class="description" style="margin-top: 20px;">
+            <strong>Important:</strong> These survey names must exactly match the surveys configured in your middleware's config.json file under "allowed_surveys".
+        </p>
+        <?php
     }
     
     /**

@@ -18,25 +18,41 @@ if (!is_user_logged_in()) {
     exit;
 }
 
-// Get attributes from shortcode
-$survey = !empty($atts['survey']) ? sanitize_text_field($atts['survey']) : '';
-$show_profile = !empty($atts['show_profile']) && $atts['show_profile'] === 'yes';
+// Extract shortcode attributes with safe defaults
+$survey_name = isset($atts['survey']) ? $atts['survey'] : '';
+$show_profile = isset($atts['show_profile']) && $atts['show_profile'] === 'yes';
+$allowed_surveys = isset($atts['allowed_surveys']) && is_array($atts['allowed_surveys']) ? $atts['allowed_surveys'] : array();
+$show_invalid_survey = isset($atts['invalid_survey']) && $atts['invalid_survey'] === true;
 
 // Get settings
 $options = get_option('redcap_portal_settings');
 $show_debug = isset($options['show_debug_info']) && $options['show_debug_info'] === 'yes' && current_user_can('manage_options');
 ?>
-
 <div class="redcap-portal-container">
     <div id="redcap-portal-content">
         <!-- Authentication check message will appear here if not logged in -->
     </div>
+    
+    <?php if (!empty($allowed_surveys)): ?>
     <div class="redcap-portal-nav" style="display: none;">
         <ul>
-            <li><a href="/my-data?survey=consent_form">Consent form</a></li>
-            <li><a href="/my-data?survey=preenrollment_screening_questionnaire">Pre-Enrollment Questionnaire</a></li>
+            <?php foreach ($allowed_surveys as $nav_survey): ?>
+                <?php if (isset($nav_survey['name'])): ?>
+                <li><a href="?survey=<?php echo esc_attr($nav_survey['name']); ?>">
+                    <?php echo esc_html(!empty($nav_survey['label']) ? $nav_survey['label'] : ucwords(str_replace('_', ' ', $nav_survey['name']))); ?>
+                </a></li>
+                <?php endif; ?>
+            <?php endforeach; ?>
         </ul>
     </div>
+    <?php endif; ?>
+    
+    <?php if ($show_invalid_survey): ?>
+    <div class="redcap-error-message">
+        <?php echo esc_html__('The requested survey is not available or does not exist.', 'redcap-patient-portal'); ?>
+    </div>
+    <?php endif; ?>
+
     <?php if ($show_profile): ?>
     <div id="redcap-patient-profile" class="redcap-portal-section" style="display: none;">
         <h2 class="redcap-section-title"><?php echo esc_html__('Your Profile', 'redcap-patient-portal'); ?></h2>
@@ -50,9 +66,9 @@ $show_debug = isset($options['show_debug_info']) && $options['show_debug_info'] 
     </div>
     <?php endif; ?>
     
-    <?php if (!empty($survey)): ?>
+    <?php if (!empty($survey_name)): ?>
     <div id="redcap-survey-results" class="redcap-portal-section" style="display: none;">
-        <h2 class="redcap-section-title"><?php echo esc_html(sprintf(__('%s Results', 'redcap-patient-portal'), ucwords(str_replace('_', ' ', $survey)))); ?></h2>
+        <h2 class="redcap-section-title"><?php echo esc_html(sprintf(__('%s Results', 'redcap-patient-portal'), ucwords(str_replace('_', ' ', $survey_name)))); ?></h2>
         <div class="redcap-survey-content">
             <!-- Survey content will be loaded here -->
             <div class="redcap-loading">
@@ -86,7 +102,7 @@ $show_debug = isset($options['show_debug_info']) && $options['show_debug_info'] 
         <div class="redcap-debug-content">
             <p><strong>Shortcode Attributes:</strong></p>
             <ul>
-                <li>Survey: <?php echo esc_html($survey ?: 'none'); ?></li>
+                <li>Survey: <?php echo esc_html($survey_name ?: 'none'); ?></li>
                 <li>Show Profile: <?php echo esc_html($show_profile ? 'yes' : 'no'); ?></li>
             </ul>
             <p><strong>Middleware URL:</strong> <?php echo esc_html($options['middleware_url'] ?? 'not set'); ?></p>
@@ -122,7 +138,7 @@ jQuery(document).ready(function($) {
         <?php if ($show_profile): ?>
         $('#redcap-patient-profile').hide();
         <?php endif; ?>
-        <?php if (!empty($survey)): ?>
+        <?php if (!empty($survey_name)): ?>
         $('#redcap-survey-results').hide();
         <?php endif; ?>
         $('#redcap-all-data').hide();
@@ -193,7 +209,7 @@ jQuery(document).ready(function($) {
         $('#redcap-patient-profile').show();
         <?php endif; ?>
         
-        <?php if (!empty($survey)): ?>
+        <?php if (!empty($survey_name)): ?>
         $('#redcap-survey-results').show();
         <?php endif; ?>
         
@@ -261,18 +277,18 @@ jQuery(document).ready(function($) {
         <?php endif; ?>
         
         // Load specific survey data if specified
-        <?php if (!empty($survey)): ?>
+        <?php if (!empty($survey_name)): ?>
         try {
-            debugLog('Loading survey: <?php echo esc_js($survey); ?>');
+            debugLog('Loading survey: <?php echo esc_js($survey_name); ?>');
             
             // First fetch the metadata to understand the structure
-            const metadataResult = await redcapData.getSurveyMetadata('<?php echo esc_js($survey); ?>');
+            const metadataResult = await redcapData.getSurveyMetadata('<?php echo esc_js($survey_name); ?>');
             if (!metadataResult.success) {
                 throw new Error(metadataResult.error || 'Failed to load survey metadata');
             }
             
             // Now fetch the actual survey data
-            const dataResult = await redcapData.getSurveyResults('<?php echo esc_js($survey); ?>');
+            const dataResult = await redcapData.getSurveyResults('<?php echo esc_js($survey_name); ?>');
             if (!dataResult.success) {
                 throw new Error(dataResult.error || 'Failed to load survey data');
             }

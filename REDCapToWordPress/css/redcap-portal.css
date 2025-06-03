@@ -212,6 +212,21 @@
 }
 
 /* ====== Survey Results ====== */
+
+#allowed-surveys-container .wp-list-table {
+    margin-top: 20px;
+}
+
+#allowed-surveys-container .form-table {
+    margin-top: 20px;
+}
+
+#allowed-surveys-container .no-surveys td {
+    text-align: center;
+    font-style: italic;
+    color: #666;
+}
+
 .redcap-survey-record {
     margin-bottom: 20px;
     padding-bottom: 20px;
